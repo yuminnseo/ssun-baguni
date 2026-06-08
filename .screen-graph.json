@@ -1,0 +1,48 @@
+{
+  "nodes": [
+    {
+      "id": "src/screens/HomeDefault/HomeDefault.tsx",
+      "label": "HomeDefault",
+      "routes": [
+        "/*",
+        "/home-defaultu9501"
+      ],
+      "dataModelId": "2352:157735",
+      "isRoot": true
+    },
+    {
+      "id": "src/screens/HomeDefaultScreen/HomeDefaultScreen.tsx",
+      "label": "HomeDefaultScreen",
+      "routes": [
+        "/home-defaultu95u4354u4449u4527u4365u4449u4363u4469u4355u4457u4540"
+      ],
+      "dataModelId": "2352:158345"
+    },
+    {
+      "id": "src/screens/HomeDefaultWrapper/HomeDefaultWrapper.tsx",
+      "label": "HomeDefaultWrapper",
+      "routes": [
+        "/home-defaultu95u4366u4462u4352u4449u4370u4449u4352u4469"
+      ],
+      "dataModelId": "2352:180646"
+    }
+  ],
+  "edges": [
+    {
+      "id": "src/screens/HomeDefaultScreen/HomeDefaultScreen.tsx:253:10-to-src/screens/HomeDefault/HomeDefault.tsx",
+      "source": "src/screens/HomeDefaultScreen/HomeDefaultScreen.tsx",
+      "target": "src/screens/HomeDefault/HomeDefault.tsx",
+      "data": {
+        "viaRoute": "/home-defaultu9501",
+        "trigger": {
+          "element": "<Link\n            className=\"inline-flex flex-col items-center justify-center px-4 py-2 relative flex-[0_0_auto] bg-white rounded-lg overflow-hidden border border-solid border-zinc-900\"\n            to=\"/home-defaultu9501\"\n            aria-label=\"오늘 보기로 이동\"\n          >\n            <div className=\"inline-flex flex-col items-start relative flex-[0_0_auto]\">\n              <div className=\"inline-flex gap-0.5 flex-[0_0_auto] items-center relative\">\n                <div className=\"inline-flex items-center justify-center relative flex-[0_0_auto]\">\n                  <div className=\"relative w-fit mt-[-1.00px] font-label-small font-[number:var(--label-small-font-weight)] text-zinc-800 text-[length:var(--label-small-font-size)] tracking-[var(--label-small-letter-spacing)] leading-[var(--label-small-line-height)] whitespace-nowrap [font-style:var(--label-small-font-style)]\">\n                    오늘\n                  </div>\n                </div>\n              </div>\n            </div>\n            <div className=\"absolute w-full h-full top-0 left-0\" />\n          </Link>",
+          "line": 253,
+          "endLine": 268,
+          "column": 10,
+          "endColumn": 17,
+          "sourceFile": "src/screens/HomeDefaultScreen/HomeDefaultScreen.tsx"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+export { HomeDefault } from "./HomeDefault";
