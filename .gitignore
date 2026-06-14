@@ -3,3 +3,11 @@ dist
 .next
 .env
 .DS_Store
+
+# local env
+.env.local
+.env.local.backup
+.vercel
+.DS_Store
+dist
+node_modules

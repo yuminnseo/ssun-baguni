@@ -77,6 +77,7 @@ export const DatePickerBottomSheet = ({
 }: DatePickerBottomSheetProps): JSX.Element => {
   const [isClosing, setIsClosing] = useState(false);
   const selectedDate = parseDateKey(dates[selectedIndex]);
+  const maxSelectableDate = dates.at(-1) ?? dates[selectedIndex];
   const [displayMonth, setDisplayMonth] = useState(
     () => new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
   );
@@ -202,6 +203,7 @@ export const DatePickerBottomSheet = ({
                   const isSelected = day.dateKey === dates[selectedIndex];
                   const isRecorded = recordedDates.includes(day.dateKey);
                   const isToday = day.dateKey === dates.at(-1);
+                  const isFuture = day.dateKey > maxSelectableDate;
 
                   return (
                     <button
@@ -210,8 +212,12 @@ export const DatePickerBottomSheet = ({
                       aria-label={
                         isSelected ? `${day.label}일 선택됨` : `${day.label}일`
                       }
+                      aria-disabled={isFuture}
                       aria-pressed={isSelected}
-                      className="date-picker-day"
+                      className={`date-picker-day ${
+                        isFuture ? "date-picker-day-disabled" : ""
+                      }`}
+                      disabled={isFuture}
                       onClick={() => selectDay(day)}
                     >
                       {isToday ? (
@@ -221,7 +227,9 @@ export const DatePickerBottomSheet = ({
                         className={`date-picker-day-label ${
                           isSelected
                             ? "date-picker-day-selected"
-                            : day.muted
+                            : isFuture
+                              ? "date-picker-day-future"
+                              : day.muted
                               ? "date-picker-day-muted"
                               : ""
                         }`}

@@ -15,6 +15,7 @@ type Point = {
 export type SlotItem = {
   anchor: Point;
   amount: number;
+  category?: string | null;
   id: string;
   imageSrc: string;
   rotation: number;
@@ -88,8 +89,10 @@ const TAG_WIDTH = 79;
 const TAG_HEIGHT = 24;
 const TAG_PULL_LIMIT = 54;
 const TAG_STEM_WIDTH = 6;
+const DRAG_OPEN_THRESHOLD = 8;
 
 const savedCartItems: Record<string, SlotItem[]> = {};
+export const NO_SPEND_STICKER_SRC = "/sticker/no-spend-day.svg";
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -100,6 +103,27 @@ const cloneItems = (items: SlotItem[]) =>
     anchor: { ...item.anchor },
     tagOffset: { ...item.tagOffset },
   }));
+
+const mergeSessionLayouts = (cartId: string, items: SlotItem[]) => {
+  const savedItems = savedCartItems[cartId] ?? [];
+  const savedItemsById = new Map(savedItems.map((item) => [item.id, item]));
+
+  return items.map((item) => {
+    const savedItem = savedItemsById.get(item.id);
+    if (!savedItem) return item;
+
+    return {
+      ...item,
+      anchor: { ...savedItem.anchor },
+      rotation: savedItem.rotation,
+      size: savedItem.size,
+      tagOffset: { ...savedItem.tagOffset },
+      tagRotation: savedItem.tagRotation,
+      x: savedItem.x,
+      y: savedItem.y,
+    };
+  });
+};
 
 export const formatWonAmount = (amount: number) =>
   new Intl.NumberFormat("ko-KR").format(amount);
@@ -115,6 +139,37 @@ export const getCartSlotSummary = (cartId: string) => {
 
 export const getCartSlotItems = (cartId: string) =>
   cloneItems(savedCartItems[cartId] ?? slotPresets[cartId] ?? []);
+
+const getMutableCartItems = (cartId: string) => {
+  if (!savedCartItems[cartId]) {
+    savedCartItems[cartId] = cloneItems(slotPresets[cartId] ?? []);
+  }
+
+  return savedCartItems[cartId];
+};
+
+export const addCartSlotItem = (cartId: string, item: SlotItem) => {
+  const items = getMutableCartItems(cartId);
+  savedCartItems[cartId] = cloneItems([...items, item]);
+};
+
+export const updateCartSlotItem = (
+  cartId: string,
+  itemId: string,
+  updates: Partial<Pick<SlotItem, "amount" | "category" | "imageSrc">>,
+) => {
+  const items = getMutableCartItems(cartId);
+  savedCartItems[cartId] = cloneItems(
+    items.map((item) => (item.id === itemId ? { ...item, ...updates } : item)),
+  );
+};
+
+export const deleteCartSlotItem = (cartId: string, itemId: string) => {
+  const items = getMutableCartItems(cartId);
+  savedCartItems[cartId] = cloneItems(
+    items.filter((item) => item.id !== itemId),
+  );
+};
 
 const randomAngle = (currentAngle: number) => {
   const nextAngle = Math.round(-45 + Math.random() * 85);
@@ -206,7 +261,26 @@ const settleItems = (currentItems: SlotItem[], movedId: string) => {
   return { ids: [...hitIds], items: nextItems };
 };
 
-const EmptyCartActions = ({ onAddItems }: { onAddItems?: () => void }) => (
+const NoSpendSticker = ({ className = "" }: { className?: string }) => (
+  <div className={`no-spend-sticker ${className}`} aria-label="무지출 데이">
+    <img
+      alt="무지출 데이"
+      className="no-spend-sticker-image"
+      draggable={false}
+      src={NO_SPEND_STICKER_SRC}
+    />
+  </div>
+);
+
+export const CartNoSpendSticker = NoSpendSticker;
+
+const EmptyCartActions = ({
+  onAddItems,
+  onMarkNoSpend,
+}: {
+  onAddItems?: () => void;
+  onMarkNoSpend?: () => void;
+}) => (
   <div className="empty-cart-actions" aria-label="빈 장바구니 작업">
     <button
       type="button"
@@ -223,6 +297,10 @@ const EmptyCartActions = ({ onAddItems }: { onAddItems?: () => void }) => (
       type="button"
       className="cart-empty-button cart-empty-button-outlined"
       onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        onMarkNoSpend?.();
+      }}
     >
       무지출 DAY
     </button>
@@ -238,6 +316,7 @@ const PriceTag = ({ amount }: { amount: number }) => (
       height="24"
       viewBox="0 0 79 24"
       fill="none"
+      preserveAspectRatio="none"
       aria-hidden="true"
     >
       <g clipPath="url(#price-tag-clip)">
@@ -275,15 +354,29 @@ const PriceTag = ({ amount }: { amount: number }) => (
 
 export const CartSlotItems = ({
   cartId,
+  itemsOverride,
+  isNoSpend = false,
+  isLoading = false,
   onAddItems,
+  onMarkNoSpend,
+  onOpenItemDetails,
 }: {
   cartId: string;
+  itemsOverride?: SlotItem[];
+  isNoSpend?: boolean;
+  isLoading?: boolean;
   onAddItems?: () => void;
+  onMarkNoSpend?: () => void;
+  onOpenItemDetails?: (cartId: string, itemId: string) => void;
 }): JSX.Element => {
   const initialItems = useMemo(() => {
+    if (itemsOverride) {
+      return cloneItems(mergeSessionLayouts(cartId, itemsOverride));
+    }
+
     const savedItems = savedCartItems[cartId];
     return cloneItems(savedItems ?? slotPresets[cartId] ?? []);
-  }, [cartId]);
+  }, [cartId, itemsOverride]);
   const [items, setItems] = useState<SlotItem[]>(() => initialItems);
   const [tagPulls, setTagPulls] = useState<Record<string, Point>>({});
   const [dragging, setDragging] = useState<{
@@ -291,6 +384,7 @@ export const CartSlotItems = ({
     mode: "item" | "tag";
   } | null>(null);
   const [settlingIds, setSettlingIds] = useState<string[]>([]);
+  const suppressItemClickRef = useRef(false);
   const dragRef = useRef<{
     id: string;
     lastDelta: Point;
@@ -298,6 +392,12 @@ export const CartSlotItems = ({
     origin: Point;
     pointer: Point;
   } | null>(null);
+
+  useEffect(() => {
+    if (itemsOverride) {
+      setItems(cloneItems(mergeSessionLayouts(cartId, itemsOverride)));
+    }
+  }, [cartId, itemsOverride]);
 
   useEffect(() => {
     savedCartItems[cartId] = cloneItems(items);
@@ -312,6 +412,7 @@ export const CartSlotItems = ({
       const item = items.find((entry) => entry.id === id);
       if (!item) return;
 
+      suppressItemClickRef.current = false;
       dragRef.current = {
         id,
         lastDelta: { x: 0, y: 0 },
@@ -327,6 +428,7 @@ export const CartSlotItems = ({
     if (!dragRef.current) return;
 
     const { id, lastDelta, mode } = dragRef.current;
+
     dragRef.current = null;
     setDragging(null);
 
@@ -394,6 +496,10 @@ export const CartSlotItems = ({
     const deltaX = event.clientX - dragRef.current.pointer.x;
     const deltaY = event.clientY - dragRef.current.pointer.y;
 
+    if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) > 6) {
+      suppressItemClickRef.current = true;
+    }
+
     if (dragRef.current.mode === "tag") {
       dragRef.current.lastDelta = { x: deltaX, y: deltaY };
       setTagPulls((currentPulls) => ({
@@ -434,16 +540,40 @@ export const CartSlotItems = ({
 
     event.preventDefault();
     event.stopPropagation();
-    finishDrag();
+
+    const { id, lastDelta, mode } = dragRef.current;
+    const isTap =
+      mode === "item" &&
+      Math.max(Math.abs(lastDelta.x), Math.abs(lastDelta.y)) <=
+        DRAG_OPEN_THRESHOLD;
 
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+
+    if (isTap) {
+      dragRef.current = null;
+      setDragging(null);
+      suppressItemClickRef.current = true;
+      onOpenItemDetails?.(cartId, id);
+      return;
+    }
+
+    finishDrag();
   };
 
   return (
     <div className="cart-slot-items" aria-label="장바구니 물품">
-      {items.length === 0 && <EmptyCartActions onAddItems={onAddItems} />}
+      {items.length === 0 &&
+        !isLoading &&
+        (isNoSpend ? (
+          <NoSpendSticker />
+        ) : (
+          <EmptyCartActions
+            onAddItems={onAddItems}
+            onMarkNoSpend={onMarkNoSpend}
+          />
+        ))}
       {items.map((item) => {
         const tagPull = tagPulls[item.id] ?? { x: 0, y: 0 };
         const isItemDragging =
@@ -453,7 +583,9 @@ export const CartSlotItems = ({
         const tagBaseX = clamp(
           item.x + item.tagOffset.x,
           16,
-          CART_WIDTH - TAG_WIDTH - 4,
+          CART_WIDTH -
+            Math.max(TAG_WIDTH, 39 + formatWonAmount(item.amount).length * 8) -
+            4,
         );
         const tagBaseY = clamp(
           item.y + item.tagOffset.y,
@@ -472,8 +604,8 @@ export const CartSlotItems = ({
             rotatePoint({ x: TAG_STEM_WIDTH, y: 0 }, item.tagRotation).y,
         };
         const itemAnchor = {
-          x: item.x + item.size * item.anchor.x,
-          y: item.y + item.size * item.anchor.y,
+          x: item.x + item.size * 0.5,
+          y: item.y + item.size * 0.5,
         };
         const bend = isTagDragging ? 18 : 8;
         const controlA = {
@@ -533,6 +665,15 @@ export const CartSlotItems = ({
               onPointerDown={startDrag(item.id, "item")}
               onPointerMove={moveDrag}
               onPointerUp={endDrag}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (suppressItemClickRef.current) {
+                  suppressItemClickRef.current = false;
+                  return;
+                }
+
+                onOpenItemDetails?.(cartId, item.id);
+              }}
             >
               <img
                 className="h-full w-full object-contain"

@@ -8,8 +8,12 @@ const formatDateKey = (date: Date) => {
     timeZone: KOREA_TIME_ZONE,
     year: "numeric",
   });
+  const parts = formatter.formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
 
-  return formatter.format(date).replaceAll("-", ".");
+  return `${year}.${month}.${day}`;
 };
 
 const addDays = (date: Date, days: number) => {

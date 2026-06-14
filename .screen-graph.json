@@ -4,8 +4,9 @@
       "id": "src/screens/HomeDefault/HomeDefault.tsx",
       "label": "HomeDefault",
       "routes": [
-        "/*",
-        "/home-defaultu9501"
+        "/home-defaultu9501",
+        "/home-defaultu95u4366u4462u4352u4449u4370u4449u4352u4469",
+        "/*"
       ],
       "dataModelId": "2352:157735",
       "isRoot": true
@@ -19,12 +20,11 @@
       "dataModelId": "2352:158345"
     },
     {
-      "id": "src/screens/HomeDefaultWrapper/HomeDefaultWrapper.tsx",
-      "label": "HomeDefaultWrapper",
+      "id": "src/screens/HomeEditColor/HomeEditColor.tsx",
+      "label": "HomeEditColor",
       "routes": [
-        "/home-defaultu95u4366u4462u4352u4449u4370u4449u4352u4469"
-      ],
-      "dataModelId": "2352:180646"
+        "/home-edit-color"
+      ]
     }
   ],
   "edges": [

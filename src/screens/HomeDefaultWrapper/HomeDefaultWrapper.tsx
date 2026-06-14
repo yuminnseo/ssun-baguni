@@ -10,6 +10,7 @@ import {
   getCartDates,
   getCartDatesWithLeadingHistory,
 } from "../../dateSystem";
+import { getCartColorOverride } from "../../cartColorOverrides";
 import { useCartSwipe } from "../../useCartSwipe";
 
 const SHEET_ANIMATION_MS = 260;
@@ -167,9 +168,22 @@ const createInitialDateCarts = (selectedDate?: string | null) => {
     dateCarts.push({ ...createEmptyCart(selectedDate), dateKey: selectedDate });
   }
 
-  return dateCarts.sort((first, second) =>
-    first.dateKey.localeCompare(second.dateKey),
-  );
+  return dateCarts
+    .sort((first, second) => first.dateKey.localeCompare(second.dateKey))
+    .map((cart) => {
+      const colorOverride = getCartColorOverride(cart.dateKey);
+
+      return colorOverride
+        ? {
+            ...cart,
+            accentBgColor: colorOverride.accentBgColor,
+            cardBg: colorOverride.cardBgColor,
+            imageAlt: colorOverride.imageAlt,
+            imageSrc: colorOverride.imageSrc,
+            receiptColor: colorOverride.receiptColor,
+          }
+        : cart;
+    });
 };
 
 const navigationItems = [

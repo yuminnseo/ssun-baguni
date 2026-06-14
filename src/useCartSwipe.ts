@@ -26,6 +26,7 @@ export const useCartSwipe = (
     initialOffset !== 0,
   );
   const [isDragging, setIsDragging] = useState(false);
+  const [isSnapping, setIsSnapping] = useState(false);
   const [visibleIndexes, setVisibleIndexes] = useState<number[]>([
     initialIndex,
   ]);
@@ -88,6 +89,28 @@ export const useCartSwipe = (
         setBaseOffset(getCenteredOffset(nextItem));
         setHasInitialAlignment(true);
       }
+    },
+    [itemCount],
+  );
+
+  const snapIndex = useCallback(
+    (index: number) => {
+      const clampedIndex = clamp(index, 0, itemCount - 1);
+      const nextItem = itemRefs.current[clampedIndex];
+
+      setIsSnapping(true);
+      setIsDragging(false);
+      setDragOffset(0);
+      setSelectedIndex(clampedIndex);
+
+      if (nextItem) {
+        setBaseOffset(getCenteredOffset(nextItem));
+        setHasInitialAlignment(true);
+      }
+
+      window.requestAnimationFrame(() => {
+        setIsSnapping(false);
+      });
     },
     [itemCount],
   );
@@ -210,7 +233,7 @@ export const useCartSwipe = (
   const railStyle = {
     transform: `translate3d(${baseOffset + dragOffset}px, 0, 0)`,
     transition:
-      isDragging || !hasInitialAlignment
+      isDragging || isSnapping || !hasInitialAlignment
         ? "none"
         : "transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1)",
   } satisfies CSSProperties;
@@ -222,6 +245,7 @@ export const useCartSwipe = (
     railOffset: baseOffset + dragOffset,
     selectedIndex,
     selectIndex,
+    snapIndex,
     setItemRef,
     visibleIndexes,
   };

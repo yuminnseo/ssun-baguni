@@ -1,14 +1,18 @@
 import {
+  CartNoSpendSticker,
   formatWonAmount,
   getCartSlotItems,
   getCartSlotSummary,
+  type SlotItem,
 } from "./CartSlotItems";
+import { getItemCategoryLabel } from "../lib/data/itemCategories";
 import {
   useRef,
   useState,
   type CSSProperties,
   type PointerEvent,
   type Ref,
+  type WheelEvent,
 } from "react";
 
 type ReceiptCart = {
@@ -22,10 +26,25 @@ type ReceiptCart = {
 type ReceiptRailProps = {
   carts: ReceiptCart[];
   dragHandleProps: Record<string, unknown>;
+  itemsByCartId?: Record<string, SlotItem[]>;
+  loadingCartIds?: Set<string>;
+  noSpendCartIds?: Set<string>;
+  onAddItems?: (index: number) => void;
+  onMarkNoSpend?: (index: number) => void;
+  onOpenItemDetails?: (cartId: string, itemId: string) => void;
   phase?: "enter" | "exit" | "idle";
   railRef: Ref<HTMLElement>;
   railStyle: CSSProperties;
   setItemRef: (index: number) => (node: HTMLElement | null) => void;
+};
+
+type CardDragMode = "pending" | "horizontal" | "vertical" | "idle";
+
+type RailPointerHandlers = {
+  onPointerCancel?: (event: PointerEvent<HTMLElement>) => void;
+  onPointerDown?: (event: PointerEvent<HTMLElement>) => void;
+  onPointerMove?: (event: PointerEvent<HTMLElement>) => void;
+  onPointerUp?: (event: PointerEvent<HTMLElement>) => void;
 };
 
 const perforationText =
@@ -44,6 +63,12 @@ const clamp = (value: number, min: number, max: number) =>
 export const ReceiptRail = ({
   carts,
   dragHandleProps,
+  itemsByCartId,
+  loadingCartIds = new Set(),
+  noSpendCartIds = new Set(),
+  onAddItems,
+  onMarkNoSpend,
+  onOpenItemDetails,
   phase = "idle",
   railRef,
   railStyle,
@@ -52,52 +77,142 @@ export const ReceiptRail = ({
   const [cardOffsetsY, setCardOffsetsY] = useState<Record<string, number>>({});
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [settlingCardId, setSettlingCardId] = useState<string | null>(null);
-  const cardDragRef = useRef({ cardId: "", startOffsetY: 0, startY: 0 });
+  const railPointerHandlers = dragHandleProps as RailPointerHandlers;
+  const cardDragRef = useRef({
+    cardId: "",
+    mode: "idle" as CardDragMode,
+    hasStartedRailDrag: false,
+    startOffsetY: 0,
+    startX: 0,
+    startY: 0,
+  });
+  const wheelSettleTimerRef = useRef<number | null>(null);
+
+  const updateCardOffset = (cardId: string, deltaY: number) => {
+    setCardOffsetsY((currentOffsets) => ({
+      ...currentOffsets,
+      [cardId]: clamp((currentOffsets[cardId] ?? 0) + deltaY, -130, 0),
+    }));
+  };
 
   const startCardDrag =
     (cardId: string) => (event: PointerEvent<HTMLDivElement>) => {
     event.stopPropagation();
     cardDragRef.current = {
       cardId,
+      hasStartedRailDrag: false,
+      mode: "pending",
       startOffsetY: cardOffsetsY[cardId] ?? 0,
+      startX: event.clientX,
       startY: event.clientY,
     };
-    setDraggingCardId(cardId);
     setSettlingCardId(null);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const moveCardDrag = (event: PointerEvent<HTMLDivElement>) => {
-    if (!draggingCardId) return;
+    if (cardDragRef.current.mode === "idle") return;
 
     event.stopPropagation();
+    const deltaX = event.clientX - cardDragRef.current.startX;
     const deltaY = event.clientY - cardDragRef.current.startY;
-    const nextOffset = clamp(cardDragRef.current.startOffsetY + deltaY, -130, 0);
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+
+    if (cardDragRef.current.mode === "pending") {
+      if (Math.max(absDeltaX, absDeltaY) < 8) return;
+
+      if (absDeltaX > absDeltaY) {
+        cardDragRef.current.mode = "horizontal";
+      } else {
+        cardDragRef.current.mode = "vertical";
+        setDraggingCardId(cardDragRef.current.cardId);
+      }
+    }
+
+    if (cardDragRef.current.mode === "horizontal") {
+      if (!cardDragRef.current.hasStartedRailDrag) {
+        cardDragRef.current.hasStartedRailDrag = true;
+        const railStartEvent = Object.assign(Object.create(event), {
+          clientX: cardDragRef.current.startX,
+        }) as PointerEvent<HTMLElement>;
+
+        railPointerHandlers.onPointerDown?.(railStartEvent);
+      }
+
+      railPointerHandlers.onPointerMove?.(
+        event as unknown as PointerEvent<HTMLElement>,
+      );
+      return;
+    }
 
     setCardOffsetsY((currentOffsets) => ({
       ...currentOffsets,
-      [cardDragRef.current.cardId]: nextOffset,
+      [cardDragRef.current.cardId]: clamp(
+        cardDragRef.current.startOffsetY + deltaY,
+        -130,
+        0,
+      ),
     }));
   };
 
+  const scrollCard =
+    (cardId: string) => (event: WheelEvent<HTMLDivElement>) => {
+      event.stopPropagation();
+      event.preventDefault();
+
+      const nextDeltaY = clamp(event.deltaY * 0.7, -32, 32);
+      if (Math.abs(nextDeltaY) < 1) return;
+
+      setSettlingCardId(null);
+      setDraggingCardId(cardId);
+      updateCardOffset(cardId, nextDeltaY);
+
+      if (wheelSettleTimerRef.current !== null) {
+        window.clearTimeout(wheelSettleTimerRef.current);
+      }
+
+      wheelSettleTimerRef.current = window.setTimeout(() => {
+        setDraggingCardId(null);
+        setSettlingCardId(cardId);
+        window.setTimeout(() => {
+          setSettlingCardId((currentCardId) =>
+            currentCardId === cardId ? null : currentCardId,
+          );
+        }, 420);
+      }, 120);
+    };
+
   const endCardDrag = (event: PointerEvent<HTMLDivElement>) => {
-    if (!draggingCardId) return;
+    if (cardDragRef.current.mode === "idle") return;
 
     event.stopPropagation();
-    const cardId = draggingCardId;
+    const { cardId, mode } = cardDragRef.current;
 
-    setDraggingCardId(null);
-    setSettlingCardId(cardId);
+    if (mode === "vertical") {
+      setDraggingCardId(null);
+      setSettlingCardId(cardId);
+    }
+
+    if (mode === "horizontal" && cardDragRef.current.hasStartedRailDrag) {
+      railPointerHandlers.onPointerUp?.(
+        event as unknown as PointerEvent<HTMLElement>,
+      );
+    }
 
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
 
-    window.setTimeout(() => {
-      setSettlingCardId((currentCardId) =>
-        currentCardId === cardId ? null : currentCardId,
-      );
-    }, 420);
+    cardDragRef.current.mode = "idle";
+
+    if (mode === "vertical") {
+      window.setTimeout(() => {
+        setSettlingCardId((currentCardId) =>
+          currentCardId === cardId ? null : currentCardId,
+        );
+      }, 420);
+    }
   };
 
   return (
@@ -108,12 +223,20 @@ export const ReceiptRail = ({
     >
       <div
         ref={railRef}
-        className="receipt-rail inline-flex items-start gap-3 min-[541px]:gap-10 relative flex-[0_0_auto]"
+        className="receipt-rail inline-flex items-start gap-3 min-[541px]:gap-10 min-[1190px]:gap-20 relative flex-[0_0_auto]"
         style={railStyle}
       >
         {carts.map((cart, index) => {
-        const { itemCount, totalAmount } = getCartSlotSummary(cart.id);
-        const items = getCartSlotItems(cart.id);
+        const items = itemsByCartId?.[cart.id] ?? getCartSlotItems(cart.id);
+        const itemSummary = itemsByCartId
+          ? {
+              itemCount: items.length,
+              totalAmount: items.reduce((sum, item) => sum + item.amount, 0),
+            }
+          : getCartSlotSummary(cart.id);
+        const { itemCount, totalAmount } = itemSummary;
+        const isNoSpend = items.length === 0 && noSpendCartIds.has(cart.id);
+        const isLoading = items.length === 0 && loadingCartIds.has(cart.id);
         const receiptColor = getReceiptColor(cart);
         const cardOffsetY = cardOffsetsY[cart.id] ?? 0;
         const cardDragStyle = {
@@ -148,6 +271,7 @@ export const ReceiptRail = ({
                     onPointerDown={startCardDrag(cart.id)}
                     onPointerMove={moveCardDrag}
                     onPointerUp={endCardDrag}
+                    onWheel={scrollCard(cart.id)}
                     style={{
                       ...cardDragStyle,
                       "--receipt-card-color": receiptColor,
@@ -205,39 +329,83 @@ export const ReceiptRail = ({
                         {perforationText}
                       </p>
                     </div>
-                    <ul className="flex flex-col items-start gap-4 px-0 py-3 relative self-stretch w-full flex-[0_0_auto] list-none m-0">
-                      {items.map((item, itemIndex) => (
-                        <li
-                          key={item.id}
-                          className="flex items-center justify-between relative self-stretch w-full flex-[0_0_auto]"
-                        >
-                          <img
-                            aria-hidden="true"
-                            className="relative w-[52px] h-[52px] object-contain"
-                            alt=""
-                            loading="lazy"
-                            src={item.imageSrc}
-                          />
-                          <div className="flex flex-col w-[122px] items-start justify-center gap-1 relative">
-                            <div
-                              className="relative self-stretch mt-[-1.00px] font-caption-medium font-[number:var(--caption-medium-font-weight)] text-[#11111170] text-[length:var(--caption-medium-font-size)] tracking-[var(--caption-medium-letter-spacing)] leading-[var(--caption-medium-line-height)] [font-style:var(--caption-medium-font-style)]"
-                              data-typography-semantic-mode="english"
-                            >
-                              {itemTimes[itemIndex] ?? "21:21"}
-                            </div>
-                            <div className="relative self-stretch font-label-medium font-[number:var(--label-medium-font-weight)] text-zinc-800 text-[length:var(--label-medium-font-size)] tracking-[var(--label-medium-letter-spacing)] leading-[var(--label-medium-line-height)] [font-style:var(--label-medium-font-style)]">
-                              상품 카테고리
-                            </div>
-                          </div>
-                          <div
-                            className="relative w-fit font-body-small font-[number:var(--body-small-font-weight)] text-zinc-800 text-[length:var(--body-small-font-size)] text-right tracking-[var(--body-small-letter-spacing)] leading-[var(--body-small-line-height)] whitespace-nowrap [font-style:var(--body-small-font-style)]"
-                            data-typography-semantic-mode="english"
+                    {items.length === 0 ? (
+                      isLoading ? null :
+                      isNoSpend ? (
+                        <div className="receipt-no-spend-wrapper">
+                          <CartNoSpendSticker className="receipt-no-spend-sticker" />
+                        </div>
+                      ) : (
+                        <div className="receipt-empty-wrapper">
+                          <button
+                            type="button"
+                            className="cart-empty-button cart-empty-button-solid"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onAddItems?.(index);
+                            }}
                           >
-                            {formatWonAmount(item.amount)}
-                          </div>
-                        </li>
-                      ))}
-                      </ul>
+                            구매한 물건 담기
+                          </button>
+                          <button
+                            type="button"
+                            className="cart-empty-button cart-empty-button-outlined"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onMarkNoSpend?.(index);
+                            }}
+                          >
+                            무지출 DAY
+                          </button>
+                        </div>
+                      )
+                    ) : (
+                      <ul className="flex flex-col items-start gap-4 px-0 py-3 relative self-stretch w-full flex-[0_0_auto] list-none m-0">
+                        {items.map((item, itemIndex) => (
+                          <li
+                            key={item.id}
+                            className="relative self-stretch w-full flex-[0_0_auto]"
+                          >
+                            <button
+                              type="button"
+                              className="receipt-line-item-button"
+                              onPointerDown={(event) => event.stopPropagation()}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onOpenItemDetails?.(cart.id, item.id);
+                              }}
+                            >
+                              <img
+                                aria-hidden="true"
+                                className="relative w-[52px] h-[52px] object-contain"
+                                alt=""
+                                loading="lazy"
+                                src={item.imageSrc}
+                              />
+                              <div className="flex flex-col w-[122px] items-start justify-center gap-1 relative">
+                              <div
+                                className="relative self-stretch mt-[-1.00px] font-caption-medium font-[number:var(--caption-medium-font-weight)] text-[#11111170] text-[length:var(--caption-medium-font-size)] tracking-[var(--caption-medium-letter-spacing)] leading-[var(--caption-medium-line-height)] [font-style:var(--caption-medium-font-style)]"
+                                data-typography-semantic-mode="english"
+                              >
+                                {itemTimes[itemIndex] ?? "21:21"}
+                              </div>
+                              <div className="relative self-stretch font-label-medium font-[number:var(--label-medium-font-weight)] text-zinc-800 text-[length:var(--label-medium-font-size)] tracking-[var(--label-medium-letter-spacing)] leading-[var(--label-medium-line-height)] [font-style:var(--label-medium-font-style)]">
+                                {getItemCategoryLabel(item.category)}
+                              </div>
+                              </div>
+                              <div
+                                className="relative w-fit font-body-small font-[number:var(--body-small-font-weight)] text-zinc-800 text-[length:var(--body-small-font-size)] text-right tracking-[var(--body-small-letter-spacing)] leading-[var(--body-small-line-height)] whitespace-nowrap [font-style:var(--body-small-font-style)]"
+                                data-typography-semantic-mode="english"
+                              >
+                                {formatWonAmount(item.amount)}
+                              </div>
+                            </button>
+                          </li>
+                        ))}
+                        </ul>
+                    )}
                     </div>
                   </div>
                 </div>
