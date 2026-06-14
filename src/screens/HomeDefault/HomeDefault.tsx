@@ -751,7 +751,7 @@ export const HomeDefault = (): JSX.Element => {
       ? frozenExitRailStyle ?? viewRailStyle
       : viewRailStyle;
   const receiptRailStyle =
-    transitionPhase === "receipt-to-cart"
+    transitionPhase !== "idle"
       ? frozenExitRailStyle ?? viewRailStyle
       : viewRailStyle;
   const isAllRequiredAgreed = requiredAgreementItems.every(
@@ -2829,6 +2829,7 @@ export const HomeDefault = (): JSX.Element => {
                 transitionPhase === "receipt-to-cart" ? undefined : railRef
               }
               railStyle={receiptRailStyle}
+              selectedIndex={selectedIndex}
               setItemRef={
                 transitionPhase === "receipt-to-cart"
                   ? (_index: number) => (_node: HTMLElement | null) => {}
@@ -3194,7 +3195,15 @@ export const HomeDefault = (): JSX.Element => {
           aria-label="약관 동의"
           role="dialog"
           aria-modal="true"
-          onClick={() => setIsTermsSheetOpen(false)}
+          onClick={(event) => {
+            event.stopPropagation();
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+          }}
         >
           <div className="terms-sheet-backdrop" aria-hidden="true" />
           <div

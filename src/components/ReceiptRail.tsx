@@ -7,12 +7,12 @@ import {
 } from "./CartSlotItems";
 import { getItemCategoryLabel } from "../lib/data/itemCategories";
 import {
+  useEffect,
   useRef,
   useState,
   type CSSProperties,
   type PointerEvent,
   type Ref,
-  type WheelEvent,
 } from "react";
 
 type ReceiptCart = {
@@ -35,6 +35,7 @@ type ReceiptRailProps = {
   phase?: "enter" | "exit" | "idle";
   railRef: Ref<HTMLElement>;
   railStyle: CSSProperties;
+  selectedIndex: number;
   setItemRef: (index: number) => (node: HTMLElement | null) => void;
 };
 
@@ -72,6 +73,7 @@ export const ReceiptRail = ({
   phase = "idle",
   railRef,
   railStyle,
+  selectedIndex,
   setItemRef,
 }: ReceiptRailProps): JSX.Element => {
   const [cardOffsetsY, setCardOffsetsY] = useState<Record<string, number>>({});
@@ -87,6 +89,13 @@ export const ReceiptRail = ({
     startY: 0,
   });
   const wheelSettleTimerRef = useRef<number | null>(null);
+  const receiptCardsRef = useRef<Record<string, HTMLDivElement | null>>({});
+  const touchScrollRef = useRef<{
+    cardId: string;
+    lastY: number;
+  } | null>(null);
+  const shouldRenderReceiptContent = (index: number) =>
+    Math.abs(index - selectedIndex) <= 1;
 
   const updateCardOffset = (cardId: string, deltaY: number) => {
     setCardOffsetsY((currentOffsets) => ({
@@ -156,32 +165,101 @@ export const ReceiptRail = ({
     }));
   };
 
-  const scrollCard =
-    (cardId: string) => (event: WheelEvent<HTMLDivElement>) => {
-      event.stopPropagation();
-      event.preventDefault();
+  useEffect(() => {
+    const cleanupCallbacks = Object.entries(receiptCardsRef.current).flatMap(
+      ([cardId, node]) => {
+        if (!node) return [];
 
-      const nextDeltaY = clamp(event.deltaY * 0.7, -32, 32);
-      if (Math.abs(nextDeltaY) < 1) return;
+        const handleWheel = (event: globalThis.WheelEvent) => {
+          event.preventDefault();
+          event.stopPropagation();
 
-      setSettlingCardId(null);
-      setDraggingCardId(cardId);
-      updateCardOffset(cardId, nextDeltaY);
+          const nextDeltaY = clamp(event.deltaY * 0.7, -32, 32);
+          if (Math.abs(nextDeltaY) < 1) return;
 
-      if (wheelSettleTimerRef.current !== null) {
-        window.clearTimeout(wheelSettleTimerRef.current);
-      }
+          setSettlingCardId(null);
+          setDraggingCardId(cardId);
+          updateCardOffset(cardId, nextDeltaY);
 
-      wheelSettleTimerRef.current = window.setTimeout(() => {
-        setDraggingCardId(null);
-        setSettlingCardId(cardId);
-        window.setTimeout(() => {
-          setSettlingCardId((currentCardId) =>
-            currentCardId === cardId ? null : currentCardId,
-          );
-        }, 420);
-      }, 120);
+          if (wheelSettleTimerRef.current !== null) {
+            window.clearTimeout(wheelSettleTimerRef.current);
+          }
+
+          wheelSettleTimerRef.current = window.setTimeout(() => {
+            setDraggingCardId(null);
+            setSettlingCardId(cardId);
+            window.setTimeout(() => {
+              setSettlingCardId((currentCardId) =>
+                currentCardId === cardId ? null : currentCardId,
+              );
+            }, 420);
+          }, 120);
+        };
+        const handleTouchStart = (event: globalThis.TouchEvent) => {
+          const firstTouch = event.touches[0];
+          if (!firstTouch) return;
+
+          touchScrollRef.current = {
+            cardId,
+            lastY: firstTouch.clientY,
+          };
+        };
+        const handleTouchMove = (event: globalThis.TouchEvent) => {
+          const firstTouch = event.touches[0];
+          if (!firstTouch) return;
+
+          event.preventDefault();
+          event.stopPropagation();
+
+          const previousTouch = touchScrollRef.current;
+          const deltaY =
+            previousTouch?.cardId === cardId
+              ? previousTouch.lastY - firstTouch.clientY
+              : 0;
+
+          touchScrollRef.current = {
+            cardId,
+            lastY: firstTouch.clientY,
+          };
+
+          const nextDeltaY = clamp(deltaY * 0.7, -32, 32);
+          if (Math.abs(nextDeltaY) < 1) return;
+
+          setSettlingCardId(null);
+          setDraggingCardId(cardId);
+          updateCardOffset(cardId, nextDeltaY);
+        };
+        const handleTouchEnd = () => {
+          touchScrollRef.current = null;
+          setDraggingCardId(null);
+          setSettlingCardId(cardId);
+          window.setTimeout(() => {
+            setSettlingCardId((currentCardId) =>
+              currentCardId === cardId ? null : currentCardId,
+            );
+          }, 420);
+        };
+
+        node.addEventListener("wheel", handleWheel, { passive: false });
+        node.addEventListener("touchstart", handleTouchStart, { passive: false });
+        node.addEventListener("touchmove", handleTouchMove, { passive: false });
+        node.addEventListener("touchend", handleTouchEnd);
+        node.addEventListener("touchcancel", handleTouchEnd);
+
+        return [
+          () => node.removeEventListener("wheel", handleWheel),
+          () => node.removeEventListener("touchstart", handleTouchStart),
+          () => node.removeEventListener("touchmove", handleTouchMove),
+          () => node.removeEventListener("touchend", handleTouchEnd),
+          () => node.removeEventListener("touchcancel", handleTouchEnd),
+        ];
+      },
+    );
+
+    return () => {
+      cleanupCallbacks.forEach((cleanup) => cleanup());
     };
+  }, [carts]);
 
   const endCardDrag = (event: PointerEvent<HTMLDivElement>) => {
     if (cardDragRef.current.mode === "idle") return;
@@ -271,12 +349,20 @@ export const ReceiptRail = ({
                     onPointerDown={startCardDrag(cart.id)}
                     onPointerMove={moveCardDrag}
                     onPointerUp={endCardDrag}
-                    onWheel={scrollCard(cart.id)}
+                    ref={(node) => {
+                      if (node) {
+                        receiptCardsRef.current[cart.id] = node;
+                      } else {
+                        delete receiptCardsRef.current[cart.id];
+                      }
+                    }}
                     style={{
                       ...cardDragStyle,
                       "--receipt-card-color": receiptColor,
                     }}
                   >
+                    {shouldRenderReceiptContent(index) ? (
+                    <>
                     <div className="receipt-card-surface" />
                     <div className="flex flex-col w-60 items-start gap-2 relative z-[1]">
                     <header className="flex items-end pt-0 pb-2 px-0 relative self-stretch w-full flex-[0_0_auto]">
@@ -407,6 +493,13 @@ export const ReceiptRail = ({
                         </ul>
                     )}
                     </div>
+                    </>
+                    ) : (
+                      <div
+                        className="w-60 min-h-[220px]"
+                        aria-hidden="true"
+                      />
+                    )}
                   </div>
                 </div>
               </div>

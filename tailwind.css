@@ -889,13 +889,16 @@ body {
 }
 
 .login-google-button:active {
-  opacity: 0.8;
+  background: #f7f7f8;
 }
 
 .login-google-icon {
   flex: 0 0 auto;
-  height: 20px;
-  width: 20px;
+  filter: none;
+  height: 25px;
+  image-rendering: auto;
+  opacity: 1;
+  width: 25px;
 }
 
 .login-required-toast {
