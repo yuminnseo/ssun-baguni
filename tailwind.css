@@ -924,6 +924,8 @@ body {
   bottom: 114px;
   color: #ffffff;
   display: inline-flex;
+  box-sizing: border-box;
+  flex-wrap: nowrap;
   font-family: "Pretendard", var(--font-base);
   font-size: var(--label-large-font-size);
   font-style: normal;
@@ -932,24 +934,23 @@ body {
   left: 50%;
   letter-spacing: var(--label-large-letter-spacing);
   line-height: var(--label-large-line-height);
-  max-width: min(420px, calc(100vw - 40px));
+  max-width: calc(100vw - 40px);
   padding: 12px 16px 12px 12px;
   position: fixed;
   text-align: center;
   transform: translate3d(-50%, 20px, 0);
-  width: fit-content;
+  width: max-content;
   word-break: keep-all;
   z-index: 25;
 }
 
 .login-required-toast span {
   box-sizing: border-box;
-  max-width: 100%;
-  min-width: 0;
+  flex-shrink: 0;
   overflow: visible;
-  overflow-wrap: break-word;
+  overflow-wrap: normal;
   text-overflow: clip;
-  white-space: normal;
+  white-space: nowrap;
   word-break: keep-all;
 }
 
@@ -960,9 +961,10 @@ body {
 .photo-preparing-toast-copy {
   align-items: center;
   display: inline-flex;
+  flex: 0 0 auto;
   gap: 0;
-  max-width: 100%;
-  min-width: 0;
+  max-width: none;
+  min-width: max-content;
   white-space: nowrap;
 }
 
