@@ -484,7 +484,7 @@ export const HomeDefault = (): JSX.Element => {
     useAuth();
   const [activeView, setActiveView] = useState<"cart" | "receipt">("cart");
   const [transitionPhase, setTransitionPhase] = useState<
-    "idle" | "cart-to-receipt" | "receipt-to-cart"
+    "idle" | "receipt-prep" | "cart-to-receipt" | "receipt-to-cart"
   >("idle");
   const [isCartReturnReady, setIsCartReturnReady] = useState(true);
   const [frozenExitRailStyle, setFrozenExitRailStyle] =
@@ -545,6 +545,7 @@ export const HomeDefault = (): JSX.Element => {
   });
   const isLoggedOutStart = isAuthReady && !isAuthenticated;
   const transitionTimerRef = useRef<number | null>(null);
+  const transitionFrameRef = useRef<number | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const backgroundFailureToastTimerRef = useRef<number | null>(null);
@@ -747,11 +748,11 @@ export const HomeDefault = (): JSX.Element => {
     } satisfies CSSProperties;
   };
   const cartRailStyle =
-    transitionPhase === "cart-to-receipt"
+    transitionPhase === "receipt-prep" || transitionPhase === "cart-to-receipt"
       ? frozenExitRailStyle ?? viewRailStyle
       : viewRailStyle;
   const receiptRailStyle =
-    transitionPhase !== "idle"
+    transitionPhase === "receipt-to-cart"
       ? frozenExitRailStyle ?? viewRailStyle
       : viewRailStyle;
   const isAllRequiredAgreed = requiredAgreementItems.every(
@@ -1673,17 +1674,27 @@ export const HomeDefault = (): JSX.Element => {
     if (transitionTimerRef.current !== null) {
       window.clearTimeout(transitionTimerRef.current);
     }
+    if (transitionFrameRef.current !== null) {
+      window.cancelAnimationFrame(transitionFrameRef.current);
+      transitionFrameRef.current = null;
+    }
 
     if (view === "receipt" && activeView === "cart") {
       setFrozenExitRailStyle(getFrozenRailStyle());
       setIsCartReturnReady(false);
-      setTransitionPhase("cart-to-receipt");
       setActiveView("receipt");
-      transitionTimerRef.current = window.setTimeout(() => {
-        setTransitionPhase("idle");
-        setFrozenExitRailStyle(null);
-        transitionTimerRef.current = null;
-      }, VIEW_TRANSITION_MS);
+      setTransitionPhase("receipt-prep");
+      transitionFrameRef.current = window.requestAnimationFrame(() => {
+        transitionFrameRef.current = window.requestAnimationFrame(() => {
+          transitionFrameRef.current = null;
+          setTransitionPhase("cart-to-receipt");
+          transitionTimerRef.current = window.setTimeout(() => {
+            setTransitionPhase("idle");
+            setFrozenExitRailStyle(null);
+            transitionTimerRef.current = null;
+          }, VIEW_TRANSITION_MS);
+        });
+      });
       return;
     }
 
@@ -1713,6 +1724,9 @@ export const HomeDefault = (): JSX.Element => {
   useEffect(() => () => {
     if (transitionTimerRef.current !== null) {
       window.clearTimeout(transitionTimerRef.current);
+    }
+    if (transitionFrameRef.current !== null) {
+      window.cancelAnimationFrame(transitionFrameRef.current);
     }
     if (loginToastTimerRef.current !== null) {
       window.clearTimeout(loginToastTimerRef.current);
@@ -2823,6 +2837,8 @@ export const HomeDefault = (): JSX.Element => {
                   ? "exit"
                   : transitionPhase === "cart-to-receipt"
                     ? "enter"
+                    : transitionPhase === "receipt-prep"
+                      ? "prep"
                     : "idle"
               }
               railRef={

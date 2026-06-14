@@ -32,7 +32,7 @@ type ReceiptRailProps = {
   onAddItems?: (index: number) => void;
   onMarkNoSpend?: (index: number) => void;
   onOpenItemDetails?: (cartId: string, itemId: string) => void;
-  phase?: "enter" | "exit" | "idle";
+  phase?: "enter" | "exit" | "idle" | "prep";
   railRef: Ref<HTMLElement>;
   railStyle: CSSProperties;
   setItemRef: (index: number) => (node: HTMLElement | null) => void;
