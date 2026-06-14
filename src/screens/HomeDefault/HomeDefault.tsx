@@ -3036,6 +3036,7 @@ export const HomeDefault = (): JSX.Element => {
                 transitionPhase === "receipt-to-cart" ? undefined : railRef
               }
               railStyle={receiptRailStyle}
+              selectedIndex={selectedIndex}
               setItemRef={
                 transitionPhase === "receipt-to-cart"
                   ? (_index: number) => (_node: HTMLElement | null) => {}

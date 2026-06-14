@@ -8,6 +8,7 @@ import {
 import { getItemCategoryLabel } from "../lib/data/itemCategories";
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -35,6 +36,7 @@ type ReceiptRailProps = {
   phase?: "enter" | "exit" | "idle" | "prep";
   railRef: Ref<HTMLElement>;
   railStyle: CSSProperties;
+  selectedIndex: number;
   setItemRef: (index: number) => (node: HTMLElement | null) => void;
 };
 
@@ -51,6 +53,7 @@ const perforationText =
   "* * * * * * * * * * * * * * * * * * * * * * * * * * *";
 
 const itemTimes = ["09:12", "10:11", "12:14", "21:21"];
+const receiptRenderRadius = 2;
 
 const getReceiptColor = (cart: ReceiptCart) =>
   cart.imageAlt.toLowerCase().includes("red")
@@ -72,6 +75,7 @@ export const ReceiptRail = ({
   phase = "idle",
   railRef,
   railStyle,
+  selectedIndex,
   setItemRef,
 }: ReceiptRailProps): JSX.Element => {
   const [cardOffsetsY, setCardOffsetsY] = useState<Record<string, number>>({});
@@ -95,6 +99,24 @@ export const ReceiptRail = ({
     startX: number;
     startY: number;
   } | null>(null);
+  const renderedReceiptIndexes = useMemo(() => {
+    const startIndex = clamp(selectedIndex - receiptRenderRadius, 0, carts.length - 1);
+    const endIndex = clamp(selectedIndex + receiptRenderRadius, 0, carts.length - 1);
+    const indexes = new Set<number>();
+
+    for (let index = startIndex; index <= endIndex; index += 1) {
+      indexes.add(index);
+    }
+
+    return indexes;
+  }, [carts.length, selectedIndex]);
+  const renderedReceiptIdsKey = useMemo(
+    () =>
+      carts
+        .flatMap((cart, index) => (renderedReceiptIndexes.has(index) ? [cart.id] : []))
+        .join(","),
+    [carts, renderedReceiptIndexes],
+  );
 
   const updateCardOffset = (cardId: string, deltaY: number) => {
     setCardOffsetsY((currentOffsets) => ({
@@ -296,7 +318,7 @@ export const ReceiptRail = ({
     return () => {
       cleanupCallbacks.forEach((cleanup) => cleanup());
     };
-  }, [carts]);
+  }, [carts, renderedReceiptIdsKey]);
 
   const endCardDrag = (event: PointerEvent<HTMLDivElement>) => {
     if (cardDragRef.current.mode === "idle") return;
@@ -342,6 +364,21 @@ export const ReceiptRail = ({
         style={railStyle}
       >
         {carts.map((cart, index) => {
+        const shouldRenderReceipt = renderedReceiptIndexes.has(index);
+
+        if (!shouldRenderReceipt) {
+          return (
+            <article
+              aria-hidden="true"
+              className="receipt-item receipt-item-placeholder justify-center px-5 py-0 inline-flex items-center relative flex-[0_0_auto]"
+              key={cart.id}
+              ref={setItemRef(index)}
+            >
+              <div className="receipt-placeholder-box" />
+            </article>
+          );
+        }
+
         const items = itemsByCartId?.[cart.id] ?? getCartSlotItems(cart.id);
         const itemSummary = itemsByCartId
           ? {

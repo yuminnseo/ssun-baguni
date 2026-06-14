@@ -338,6 +338,16 @@ body {
   z-index: 2;
 }
 
+.receipt-item-placeholder {
+  pointer-events: none;
+}
+
+.receipt-placeholder-box {
+  flex: 0 0 auto;
+  height: 486px;
+  width: 324px;
+}
+
 .receipt-main-prep {
   backface-visibility: hidden;
   left: 0;
