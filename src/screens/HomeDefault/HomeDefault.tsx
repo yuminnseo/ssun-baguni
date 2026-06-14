@@ -374,6 +374,9 @@ const getPaletteIndex = (dateKey: string) =>
   [...dateKey].reduce((sum, character) => sum + character.charCodeAt(0), 0) %
   emptyCartPalette.length;
 
+const isValidDateKey = (dateKey?: string | null) =>
+  Boolean(dateKey && /^\d{4}\.\d{2}\.\d{2}$/.test(dateKey));
+
 const createEmptyCart = (dateKey: string, paletteIndex?: number) => {
   const palette =
     emptyCartPalette[paletteIndex ?? getPaletteIndex(dateKey)];
@@ -574,7 +577,12 @@ export const HomeDefault = (): JSX.Element => {
     typeof location.state?.selectedDate === "string"
       ? location.state.selectedDate
       : null;
-  const requestedSelectedDate = stateSelectedDate ?? querySelectedDate;
+  const requestedSelectedDate =
+    isValidDateKey(stateSelectedDate)
+      ? stateSelectedDate
+      : isValidDateKey(querySelectedDate)
+        ? querySelectedDate
+        : null;
   const [dateCarts, setDateCarts] = useState(() =>
     createInitialDateCarts(requestedSelectedDate),
   );
@@ -583,23 +591,11 @@ export const HomeDefault = (): JSX.Element => {
     typeof location.state?.selectedIndex === "number"
       ? location.state.selectedIndex
       : null;
-  const legacyIndexOffset = requestedSelectedDate ? 0 : firstBaseDateIndex;
+  const todayIndex = Math.max(cartDates.indexOf(getKoreaToday()), cartDates.length - 1);
   const initialSelectedIndex =
     requestedSelectedDate && cartDates.includes(requestedSelectedDate)
       ? cartDates.indexOf(requestedSelectedDate)
-      : stateSelectedIndex !== null
-        ? Math.min(
-            Math.max(stateSelectedIndex + legacyIndexOffset, 0),
-            dateCarts.length - 1,
-          )
-      : querySelectedDate && cartDates.includes(querySelectedDate)
-        ? cartDates.indexOf(querySelectedDate)
-      : Number.isFinite(querySelectedIndex)
-        ? Math.min(
-            Math.max(querySelectedIndex + legacyIndexOffset, 0),
-            dateCarts.length - 1,
-          )
-      : dateCarts.length - 1;
+      : todayIndex;
   const initialRailOffset =
     typeof location.state?.railOffset === "number"
       ? location.state.railOffset
@@ -638,7 +634,9 @@ export const HomeDefault = (): JSX.Element => {
   }, [dateCarts, selectedIndex, visibleIndexes]);
   const visibleDateRangeKey = visibleDateKeys.join("|");
   const isCartDataResolved = (dateKey: string) =>
-    !isAuthenticated ||
+    !isAuthReady
+      ? false
+      : !isAuthenticated ||
     dbCartData.loadedDateKeys.has(dateKey) ||
     dbCartData.status === "error";
   const dbItemsByCartId = useMemo(() => {
@@ -687,10 +685,16 @@ export const HomeDefault = (): JSX.Element => {
     [dateCarts, dbCartData.loadedDateKeys, dbCartData.status, isAuthenticated],
   );
   const getDisplayCartItems = (cartId: string, dateKey: string) =>
-    dbCartData.loadedDateKeys.has(dateKey)
+    !isAuthReady || (isAuthenticated && !dbCartData.loadedDateKeys.has(dateKey))
+      ? []
+      : dbCartData.loadedDateKeys.has(dateKey)
       ? dbCartData.slotItemsByDate[dateKey] ?? []
       : getCartSlotItems(cartId);
   const getDisplayCartSummary = (cartId: string, dateKey: string) => {
+    if (!isAuthReady || (isAuthenticated && !dbCartData.loadedDateKeys.has(dateKey))) {
+      return { itemCount: 0, totalAmount: 0 };
+    }
+
     if (dbCartData.loadedDateKeys.has(dateKey)) {
       const dbItems = dbCartData.slotItemsByDate[dateKey] ?? [];
 
@@ -1591,7 +1595,6 @@ export const HomeDefault = (): JSX.Element => {
     resetStartState();
   };
   const resetStartState = () => {
-    setIsTermsSheetOpen(false);
     navigate(`/home-defaultu9501?selectedIndex=${selectedIndex}&selectedDate=${cartDates[selectedIndex]}`, {
       replace: true,
       state: { selectedIndex, selectedDate: cartDates[selectedIndex] },
@@ -2774,12 +2777,12 @@ export const HomeDefault = (): JSX.Element => {
                                 type="button"
                                 className="login-google-button"
                                 onPointerDown={(event) => event.stopPropagation()}
-                                onClick={startGoogleLogin}
-                              >
-                                <img
-                                  alt=""
-                                  aria-hidden="true"
-                                  className="login-google-icon"
+                              onClick={startGoogleLogin}
+                            >
+                              <img
+                                alt=""
+                                aria-hidden="true"
+                                className="login-google-icon"
                                   src="/color-icons/icon-color-google.svg"
                                 />
                                 <span>구글 계정으로 로그인</span>
@@ -2789,11 +2792,7 @@ export const HomeDefault = (): JSX.Element => {
                             <CartSlotItems
                               key={`${cart.id}-${cartDataVersion}`}
                               cartId={cart.id}
-                              itemsOverride={
-                                isCartDataResolved(cart.dateKey)
-                                  ? displayItems
-                                  : undefined
-                              }
+                              itemsOverride={displayItems}
                               isLoading={!isCartDataResolved(cart.dateKey)}
                               isNoSpend={effectiveNoSpendCartIds.has(cart.id)}
                               onAddItems={() => openAddSheet(index)}

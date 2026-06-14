@@ -1,17 +1,9 @@
-const KOREA_TIME_ZONE = "Asia/Seoul";
 const CART_HISTORY_DAYS = 365;
 
 const formatDateKey = (date: Date) => {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: KOREA_TIME_ZONE,
-    year: "numeric",
-  });
-  const parts = formatter.formatToParts(date);
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
+  const year = String(date.getFullYear());
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}.${month}.${day}`;
 };
