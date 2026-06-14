@@ -35,7 +35,6 @@ type ReceiptRailProps = {
   phase?: "enter" | "exit" | "idle";
   railRef: Ref<HTMLElement>;
   railStyle: CSSProperties;
-  selectedIndex: number;
   setItemRef: (index: number) => (node: HTMLElement | null) => void;
 };
 
@@ -73,7 +72,6 @@ export const ReceiptRail = ({
   phase = "idle",
   railRef,
   railStyle,
-  selectedIndex,
   setItemRef,
 }: ReceiptRailProps): JSX.Element => {
   const [cardOffsetsY, setCardOffsetsY] = useState<Record<string, number>>({});
@@ -93,9 +91,10 @@ export const ReceiptRail = ({
   const touchScrollRef = useRef<{
     cardId: string;
     lastY: number;
+    mode: "pending" | "horizontal" | "vertical";
+    startX: number;
+    startY: number;
   } | null>(null);
-  const shouldRenderReceiptContent = (index: number) =>
-    Math.abs(index - selectedIndex) <= 1;
 
   const updateCardOffset = (cardId: string, deltaY: number) => {
     setCardOffsetsY((currentOffsets) => ({
@@ -171,6 +170,8 @@ export const ReceiptRail = ({
         if (!node) return [];
 
         const handleWheel = (event: globalThis.WheelEvent) => {
+          if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+
           event.preventDefault();
           event.stopPropagation();
 
@@ -202,24 +203,54 @@ export const ReceiptRail = ({
           touchScrollRef.current = {
             cardId,
             lastY: firstTouch.clientY,
+            mode: "pending",
+            startX: firstTouch.clientX,
+            startY: firstTouch.clientY,
           };
         };
         const handleTouchMove = (event: globalThis.TouchEvent) => {
           const firstTouch = event.touches[0];
           if (!firstTouch) return;
 
+          const previousTouch = touchScrollRef.current;
+          if (!previousTouch || previousTouch.cardId !== cardId) {
+            touchScrollRef.current = {
+              cardId,
+              lastY: firstTouch.clientY,
+              mode: "pending",
+              startX: firstTouch.clientX,
+              startY: firstTouch.clientY,
+            };
+            return;
+          }
+
+          const totalDeltaX = firstTouch.clientX - previousTouch.startX;
+          const totalDeltaY = firstTouch.clientY - previousTouch.startY;
+          const absTotalDeltaX = Math.abs(totalDeltaX);
+          const absTotalDeltaY = Math.abs(totalDeltaY);
+
+          if (previousTouch.mode === "pending") {
+            if (Math.max(absTotalDeltaX, absTotalDeltaY) < 8) return;
+
+            previousTouch.mode =
+              absTotalDeltaX > absTotalDeltaY ? "horizontal" : "vertical";
+          }
+
+          if (previousTouch.mode === "horizontal") {
+            return;
+          }
+
           event.preventDefault();
           event.stopPropagation();
 
-          const previousTouch = touchScrollRef.current;
-          const deltaY =
-            previousTouch?.cardId === cardId
-              ? previousTouch.lastY - firstTouch.clientY
-              : 0;
+          const deltaY = previousTouch.lastY - firstTouch.clientY;
 
           touchScrollRef.current = {
             cardId,
             lastY: firstTouch.clientY,
+            mode: "vertical",
+            startX: previousTouch.startX,
+            startY: previousTouch.startY,
           };
 
           const nextDeltaY = clamp(deltaY * 0.7, -32, 32);
@@ -230,7 +261,13 @@ export const ReceiptRail = ({
           updateCardOffset(cardId, nextDeltaY);
         };
         const handleTouchEnd = () => {
+          const wasVertical =
+            touchScrollRef.current?.cardId === cardId &&
+            touchScrollRef.current.mode === "vertical";
+
           touchScrollRef.current = null;
+          if (!wasVertical) return;
+
           setDraggingCardId(null);
           setSettlingCardId(cardId);
           window.setTimeout(() => {
@@ -361,7 +398,6 @@ export const ReceiptRail = ({
                       "--receipt-card-color": receiptColor,
                     }}
                   >
-                    {shouldRenderReceiptContent(index) ? (
                     <>
                     <div className="receipt-card-surface" />
                     <div className="flex flex-col w-60 items-start gap-2 relative z-[1]">
@@ -494,12 +530,6 @@ export const ReceiptRail = ({
                     )}
                     </div>
                     </>
-                    ) : (
-                      <div
-                        className="w-60 min-h-[220px]"
-                        aria-hidden="true"
-                      />
-                    )}
                   </div>
                 </div>
               </div>
