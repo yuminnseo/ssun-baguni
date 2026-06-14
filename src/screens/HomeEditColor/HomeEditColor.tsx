@@ -367,7 +367,7 @@ export const HomeEditColor = (): JSX.Element => {
           aria-hidden="true"
         >
           <img
-            className="relative flex-1 self-stretch w-full grow"
+            className="color-swatch-gradient-image relative flex-1 self-stretch w-full grow"
             alt=""
             src="https://c.animaapp.com/RVtpFFFT/img/gradient-solid.svg"
           />

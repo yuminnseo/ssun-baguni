@@ -499,6 +499,8 @@ export const HomeDefault = (): JSX.Element => {
   const [isLoginToastVisible, setIsLoginToastVisible] = useState(false);
   const [isPhotoPreparingToastVisible, setIsPhotoPreparingToastVisible] =
     useState(false);
+  const [photoPreparingDotCount, setPhotoPreparingDotCount] = useState(1);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [actionFailureToastMessage, setActionFailureToastMessage] =
     useState("");
   const [isTermsSheetOpen, setIsTermsSheetOpen] = useState(false);
@@ -555,6 +557,7 @@ export const HomeDefault = (): JSX.Element => {
   const originalImageUploadPromiseRef = useRef<Promise<string> | null>(null);
   const loginToastTimerRef = useRef<number | null>(null);
   const photoPreparingToastTimerRef = useRef<number | null>(null);
+  const photoPreparingDotsTimerRef = useRef<number | null>(null);
   const actionFailureToastTimerRef = useRef<number | null>(null);
   const detailGradientRef = useRef<Record<string, string>>({});
   const detailSwipeRef = useRef<{ startX: number; startY: number } | null>(null);
@@ -789,16 +792,31 @@ export const HomeDefault = (): JSX.Element => {
   const showPhotoPreparingToast = () => {
     if (photoPreparingToastTimerRef.current !== null) {
       window.clearTimeout(photoPreparingToastTimerRef.current);
+      photoPreparingToastTimerRef.current = null;
+    }
+    if (photoPreparingDotsTimerRef.current === null) {
+      photoPreparingDotsTimerRef.current = window.setInterval(() => {
+        setPhotoPreparingDotCount((currentCount) =>
+          currentCount >= 3 ? 1 : currentCount + 1,
+        );
+      }, 420);
+    }
+
+    setPhotoPreparingDotCount(1);
+    setIsPhotoPreparingToastVisible(true);
+  };
+  const hidePhotoPreparingToast = () => {
+    if (photoPreparingToastTimerRef.current !== null) {
+      window.clearTimeout(photoPreparingToastTimerRef.current);
+      photoPreparingToastTimerRef.current = null;
+    }
+    if (photoPreparingDotsTimerRef.current !== null) {
+      window.clearInterval(photoPreparingDotsTimerRef.current);
+      photoPreparingDotsTimerRef.current = null;
     }
 
     setIsPhotoPreparingToastVisible(false);
-    window.requestAnimationFrame(() => {
-      setIsPhotoPreparingToastVisible(true);
-      photoPreparingToastTimerRef.current = window.setTimeout(() => {
-        setIsPhotoPreparingToastVisible(false);
-        photoPreparingToastTimerRef.current = null;
-      }, LOGIN_TOAST_MS);
-    });
+    setPhotoPreparingDotCount(1);
   };
   const showActionFailureToast = (message: string) => {
     if (actionFailureToastTimerRef.current !== null) {
@@ -952,7 +970,7 @@ export const HomeDefault = (): JSX.Element => {
     setIsItemTimePickerOpen(false);
     setEditingItem(null);
     setIsItemFlowSaving(false);
-    setIsPhotoPreparingToastVisible(false);
+    hidePhotoPreparingToast();
     setActionFailureToastMessage("");
     setSelectedItemImageFile(null);
     resetItemImagePreparation();
@@ -1472,6 +1490,7 @@ export const HomeDefault = (): JSX.Element => {
           });
           showPhotoPreparingToast();
           const removedBgImageUrl = await pendingRemovalPromise;
+          hidePhotoPreparingToast();
 
           if (removedBgImageUrl) {
             removedBgImageSrc = removedBgImageUrl;
@@ -1537,6 +1556,7 @@ export const HomeDefault = (): JSX.Element => {
       }
     } catch (error) {
       console.error("Failed to save item.", error);
+      hidePhotoPreparingToast();
 
       if (hadNoSpendDay) {
         setNoSpendStateForDate(targetCartId, targetDateKey);
@@ -1730,6 +1750,12 @@ export const HomeDefault = (): JSX.Element => {
     }
     if (loginToastTimerRef.current !== null) {
       window.clearTimeout(loginToastTimerRef.current);
+    }
+    if (photoPreparingToastTimerRef.current !== null) {
+      window.clearTimeout(photoPreparingToastTimerRef.current);
+    }
+    if (photoPreparingDotsTimerRef.current !== null) {
+      window.clearInterval(photoPreparingDotsTimerRef.current);
     }
     if (actionFailureToastTimerRef.current !== null) {
       window.clearTimeout(actionFailureToastTimerRef.current);
@@ -2080,8 +2106,11 @@ export const HomeDefault = (): JSX.Element => {
   ]);
 
   useEffect(() => {
+    if (!isAuthReady) return;
+
     if (!isAuthenticated || !user?.id) {
       setHasAcceptedTerms(false);
+      setIsTermsSheetOpen(false);
       return;
     }
 
@@ -2089,7 +2118,7 @@ export const HomeDefault = (): JSX.Element => {
     setHasAcceptedTerms(hasStoredAgreement);
     setIsTermsSheetOpen(!hasStoredAgreement);
     resetStartState();
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthReady, isAuthenticated, user?.id]);
 
   useEffect(() => {
     if (!isAuthReady || appOpenedTrackedRef.current) return;
@@ -2199,6 +2228,32 @@ export const HomeDefault = (): JSX.Element => {
     }
   }, [itemFlowStep, itemDate]);
 
+  useEffect(() => {
+    if (itemFlowStep !== "price" || typeof window === "undefined") {
+      setKeyboardOffset(0);
+      return;
+    }
+
+    const visualViewport = window.visualViewport;
+    if (!visualViewport) return;
+
+    const updateKeyboardOffset = () => {
+      const viewportBottom = visualViewport.offsetTop + visualViewport.height;
+      const nextOffset = Math.max(0, window.innerHeight - viewportBottom);
+      setKeyboardOffset(Math.round(nextOffset));
+    };
+
+    updateKeyboardOffset();
+    visualViewport.addEventListener("resize", updateKeyboardOffset);
+    visualViewport.addEventListener("scroll", updateKeyboardOffset);
+
+    return () => {
+      visualViewport.removeEventListener("resize", updateKeyboardOffset);
+      visualViewport.removeEventListener("scroll", updateKeyboardOffset);
+      setKeyboardOffset(0);
+    };
+  }, [itemFlowStep]);
+
   if (itemFlowStep !== null) {
     return (
       <main className="item-flow-screen" aria-label="구매품 추가">
@@ -2288,6 +2343,7 @@ export const HomeDefault = (): JSX.Element => {
                     id="item-price"
                     aria-label="구매 금액"
                     inputMode="numeric"
+                    pattern="[0-9]*"
                     value={formatPriceInput(itemPrice)}
                     onChange={(event) => handleItemPriceChange(event.target.value)}
                     placeholder="0"
@@ -2310,7 +2366,14 @@ export const HomeDefault = (): JSX.Element => {
                 </div>
               </section>
             </section>
-            <div className="item-flow-action-area item-flow-action-single item-flow-price-action-area">
+            <div
+              className="item-flow-action-area item-flow-action-single item-flow-price-action-area"
+              style={
+                {
+                  "--item-flow-keyboard-offset": `${keyboardOffset}px`,
+                } as CSSProperties
+              }
+            >
               <button
                 type="button"
                 className="item-flow-primary-button item-flow-next-button"
@@ -2425,7 +2488,7 @@ export const HomeDefault = (): JSX.Element => {
                 <button
                   type="button"
                   className="item-flow-primary-button"
-                  disabled={!itemCategory || isItemFlowSaving}
+                  disabled={!itemCategory || !itemReason || isItemFlowSaving}
                   onClick={saveItemFlow}
                 >
                   {isItemFlowSaving
@@ -2559,14 +2622,18 @@ export const HomeDefault = (): JSX.Element => {
           </section>
         )}
         {isPhotoPreparingToastVisible && (
-          <div className="login-required-toast" role="status" aria-live="polite">
+          <div
+            className="login-required-toast photo-preparing-toast"
+            role="status"
+            aria-live="polite"
+          >
             <img
               alt=""
               aria-hidden="true"
               className="login-required-toast-icon"
               src="/icons/icon-sparkle.svg"
             />
-            <span>사진을 준비 중이에요.</span>
+            <span>{`사진을 준비 중이에요${".".repeat(photoPreparingDotCount)}`}</span>
           </div>
         )}
       </main>
@@ -2654,7 +2721,7 @@ export const HomeDefault = (): JSX.Element => {
       >
         <div className="segment-control-scrim flex flex-col items-center justify-center px-5 py-2 fixed top-10 left-0 z-[10] w-full">
           <div
-            className="flex w-full h-full items-center gap-2.5 absolute top-0 left-0"
+            className="flex w-full h-full items-center gap-2.5 absolute top-0 left-0 pointer-events-none"
             aria-hidden="true"
           >
             <img
@@ -2668,6 +2735,8 @@ export const HomeDefault = (): JSX.Element => {
               className="inline-flex items-center gap-1 relative flex-[0_0_auto]"
               role="tablist"
               aria-label="보기 전환"
+              onPointerDown={(event) => event.stopPropagation()}
+              onTouchStart={(event) => event.stopPropagation()}
             >
               {tabs.map((tab) => {
                 const isActive = tab.id === activeView;
@@ -2678,7 +2747,12 @@ export const HomeDefault = (): JSX.Element => {
                   type="button"
                   role="tab"
                   aria-selected={isActive}
-                  onClick={() => switchView(tab.id as "cart" | "receipt")}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onTouchStart={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    switchView(tab.id as "cart" | "receipt");
+                  }}
                   className={`inline-flex items-center justify-center gap-2 px-3 py-1.5 relative flex-[0_0_auto] rounded-full ${
                     isActive ? "bg-white tab-active-shadow" : ""
                   }`}

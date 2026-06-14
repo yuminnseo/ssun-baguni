@@ -927,11 +927,26 @@ body {
   left: 50%;
   letter-spacing: var(--label-large-letter-spacing);
   line-height: var(--label-large-line-height);
+  max-width: min(342px, calc(100vw - 32px));
   padding: 12px 16px 12px 12px;
   position: fixed;
   transform: translate3d(-50%, 20px, 0);
-  white-space: nowrap;
+  white-space: normal;
+  word-break: keep-all;
   z-index: 25;
+}
+
+.login-required-toast span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.photo-preparing-toast {
+  animation: login-required-toast-in 180ms ease both;
+}
+
+.color-swatch-gradient-image {
+  transform: scaleY(-1);
 }
 
 .login-required-toast-icon {
@@ -1499,6 +1514,8 @@ body {
   display: flex;
   flex-direction: column;
   flex: 0 0 auto;
+  transform: translate3d(0, calc(-1 * var(--item-flow-keyboard-offset, 0px)), 0);
+  transition: transform 180ms ease;
   width: 100%;
 }
 
@@ -1881,11 +1898,23 @@ body {
 
 @media (max-width: 480px) {
   .item-flow-mobile-keyboard {
-    display: grid;
+    display: none;
   }
 
   .item-flow-mobile-keyboard-safe {
-    display: block;
+    display: none;
+  }
+}
+
+@keyframes login-required-toast-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-50%, 20px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(-50%, 0, 0);
   }
 }
 
