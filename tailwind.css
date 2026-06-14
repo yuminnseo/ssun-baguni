@@ -944,10 +944,8 @@ body {
 }
 
 .login-required-toast span {
-  min-width: 0;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
   white-space: nowrap;
 }
 
@@ -955,10 +953,17 @@ body {
   animation: login-required-toast-in 180ms ease both;
 }
 
+.photo-preparing-toast-text {
+  flex: 0 0 auto;
+  min-width: max-content;
+  overflow: visible;
+  text-overflow: clip;
+}
+
 .photo-preparing-toast-dots {
   display: inline-block;
-  flex: 0 0 18px;
-  min-width: 18px;
+  flex: 0 0 1.5em;
+  min-width: 1.5em;
   overflow: visible;
   text-align: left;
   white-space: nowrap;
@@ -1229,6 +1234,11 @@ body {
   gap: 20px;
   padding: 20px;
   width: 100%;
+}
+
+.item-flow-price-content {
+  overflow-y: auto;
+  padding-bottom: 128px;
 }
 
 .item-flow-details-content {
@@ -1535,6 +1545,20 @@ body {
   flex-direction: column;
   flex: 0 0 auto;
   width: 100%;
+}
+
+.item-flow-price-action-area {
+  bottom: calc(
+    var(--item-flow-keyboard-offset, 0px) + env(safe-area-inset-bottom) + 12px
+  );
+  left: 0;
+  position: fixed;
+  right: 0;
+  z-index: 35;
+}
+
+.item-flow-price-action-area .item-flow-safe-area {
+  display: none;
 }
 
 .item-flow-action-row,
@@ -1922,16 +1946,6 @@ body {
     left: 50%;
     max-width: calc(100vw - 40px);
     width: fit-content;
-  }
-
-  .item-flow-price-action-area {
-    bottom: calc(
-      var(--item-flow-keyboard-offset, 0px) + env(safe-area-inset-bottom) + 12px
-    );
-    left: 0;
-    position: fixed;
-    right: 0;
-    z-index: 35;
   }
 
   .item-flow-mobile-keyboard {

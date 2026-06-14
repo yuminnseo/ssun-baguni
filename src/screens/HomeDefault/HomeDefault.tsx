@@ -2374,7 +2374,7 @@ export const HomeDefault = (): JSX.Element => {
 
         {itemFlowStep === "price" ? (
           <>
-            <section className="item-flow-content">
+            <section className="item-flow-content item-flow-price-content">
               <div className="item-flow-date-field-group">
                 <div className="item-flow-select-block">
                   <label className="item-flow-section-title">
@@ -2726,7 +2726,9 @@ export const HomeDefault = (): JSX.Element => {
               className="login-required-toast-icon"
               src="/icons/icon-sparkle.svg"
             />
-            <span>사진을 준비 중이에요</span>
+            <span className="photo-preparing-toast-text">
+              사진을 준비 중이에요
+            </span>
             <span className="photo-preparing-toast-dots">
               {".".repeat(photoPreparingDotCount)}
             </span>
