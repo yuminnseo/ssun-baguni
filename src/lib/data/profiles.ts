@@ -48,3 +48,26 @@ export const updateProfile = async (
 
   return data;
 };
+
+export const markProfileTermsAgreed = async (
+  userId: string,
+): Promise<Profile> => {
+  const agreedAt = new Date().toISOString();
+  const { data, error } = await getSupabaseClient()
+    .from("profiles")
+    .upsert(
+      {
+        id: userId,
+        terms_agreed_at: agreedAt,
+      },
+      { onConflict: "id" },
+    )
+    .select("*")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+};

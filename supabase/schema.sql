@@ -8,8 +8,12 @@ create table if not exists public.profiles (
   email text,
   display_name text,
   avatar_url text,
+  terms_agreed_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+alter table public.profiles
+  add column if not exists terms_agreed_at timestamptz;
 
 create table if not exists public.items (
   id uuid primary key default gen_random_uuid(),

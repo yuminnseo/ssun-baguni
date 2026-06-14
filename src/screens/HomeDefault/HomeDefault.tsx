@@ -65,6 +65,10 @@ import {
   resetAnalytics,
   trackEvent,
 } from "../../lib/analytics/mixpanel";
+import {
+  getProfile,
+  markProfileTermsAgreed,
+} from "../../lib/data/profiles";
 import { useCartSwipe } from "../../useCartSwipe";
 
 const tabs = [
@@ -505,6 +509,8 @@ export const HomeDefault = (): JSX.Element => {
     useState("");
   const [isTermsSheetOpen, setIsTermsSheetOpen] = useState(false);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
+  const [isTermsAgreementLoading, setIsTermsAgreementLoading] =
+    useState(false);
   const [itemFlowStep, setItemFlowStep] = useState<ItemFlowStep>(null);
   const [selectedItemImageFile, setSelectedItemImageFile] =
     useState<File | null>(null);
@@ -882,6 +888,10 @@ export const HomeDefault = (): JSX.Element => {
   const requireStorageAccess = () => {
     if (!isAuthReady || !user?.id || isLoggedOutStart) {
       showLoginToast();
+      return false;
+    }
+
+    if (isTermsAgreementLoading) {
       return false;
     }
 
@@ -1600,7 +1610,7 @@ export const HomeDefault = (): JSX.Element => {
       terms: checked,
     });
   };
-  const startHome = () => {
+  const startHome = async () => {
     if (!isAllRequiredAgreed) return;
 
     if (!user?.id) {
@@ -1608,12 +1618,23 @@ export const HomeDefault = (): JSX.Element => {
       return;
     }
 
-    writeTermsAgreement(user.id);
+    setIsTermsAgreementLoading(true);
+    try {
+      await markProfileTermsAgreed(user.id);
+      writeTermsAgreement(user.id);
+    } catch (error) {
+      console.error("Failed to save terms agreement.", error);
+      showActionFailureToast("약관 동의 저장에 실패했어요. 다시 시도해주세요.");
+      setIsTermsAgreementLoading(false);
+      return;
+    }
+
     trackEvent(analyticsEvents.TERMS_AGREED, {
       ...getCommonAnalyticsProperties(),
     });
     setHasAcceptedTerms(true);
     setIsTermsSheetOpen(false);
+    setIsTermsAgreementLoading(false);
     resetStartState();
   };
   const resetStartState = () => {
@@ -2112,13 +2133,64 @@ export const HomeDefault = (): JSX.Element => {
     if (!isAuthenticated || !user?.id) {
       setHasAcceptedTerms(false);
       setIsTermsSheetOpen(false);
+      setIsTermsAgreementLoading(false);
       return;
     }
 
-    const hasStoredAgreement = readTermsAgreement(user.id);
-    setHasAcceptedTerms(hasStoredAgreement);
-    setIsTermsSheetOpen(!hasStoredAgreement);
-    resetStartState();
+    let isCancelled = false;
+    setIsTermsAgreementLoading(true);
+    setIsTermsSheetOpen(false);
+
+    void (async () => {
+      try {
+        const profile = await getProfile(user.id);
+        const hasDbAgreement = Boolean(profile?.terms_agreed_at);
+
+        if (hasDbAgreement) {
+          writeTermsAgreement(user.id);
+          if (!isCancelled) {
+            setHasAcceptedTerms(true);
+            setIsTermsSheetOpen(false);
+            resetStartState();
+          }
+          return;
+        }
+
+        const hasStoredAgreement = readTermsAgreement(user.id);
+        if (hasStoredAgreement) {
+          await markProfileTermsAgreed(user.id);
+          if (!isCancelled) {
+            setHasAcceptedTerms(true);
+            setIsTermsSheetOpen(false);
+            resetStartState();
+          }
+          return;
+        }
+
+        if (!isCancelled) {
+          setHasAcceptedTerms(false);
+          setIsTermsSheetOpen(true);
+          resetStartState();
+        }
+      } catch (error) {
+        console.error("Failed to load terms agreement.", error);
+        const hasStoredAgreement = readTermsAgreement(user.id);
+
+        if (!isCancelled) {
+          setHasAcceptedTerms(hasStoredAgreement);
+          setIsTermsSheetOpen(!hasStoredAgreement);
+          resetStartState();
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsTermsAgreementLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [isAuthReady, isAuthenticated, user?.id]);
 
   useEffect(() => {
@@ -2260,6 +2332,20 @@ export const HomeDefault = (): JSX.Element => {
       setKeyboardOffset(0);
     };
   }, [itemFlowStep]);
+
+  useEffect(() => {
+    if (!detailOverlay || typeof document === "undefined") return;
+
+    const previousOverflow = document.body.style.overflow;
+    const previousTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.touchAction = previousTouchAction;
+    };
+  }, [detailOverlay]);
 
   if (itemFlowStep !== null) {
     return (
@@ -3104,6 +3190,10 @@ export const HomeDefault = (): JSX.Element => {
               }`}
               aria-label="구매품 상세"
               onClick={closeItemDetails}
+              onPointerDown={(event) => event.stopPropagation()}
+              onPointerMove={(event) => event.stopPropagation()}
+              onPointerUp={(event) => event.stopPropagation()}
+              onTouchMove={(event) => event.stopPropagation()}
             >
               <div className="item-detail-summary" aria-hidden="true">
                 <time
@@ -3120,12 +3210,21 @@ export const HomeDefault = (): JSX.Element => {
                 className="item-detail-carousel"
                 onClick={(event) => event.stopPropagation()}
                 onPointerDown={(event) => {
+                  event.stopPropagation();
+                  event.currentTarget.setPointerCapture?.(event.pointerId);
                   detailSwipeRef.current = {
                     startX: event.clientX,
                     startY: event.clientY,
                   };
                 }}
+                onPointerMove={(event) => {
+                  event.stopPropagation();
+                }}
                 onPointerUp={(event) => {
+                  event.stopPropagation();
+                  if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+                    event.currentTarget.releasePointerCapture(event.pointerId);
+                  }
                   if (!detailSwipeRef.current) return;
 
                   const deltaX = event.clientX - detailSwipeRef.current.startX;
@@ -3138,9 +3237,14 @@ export const HomeDefault = (): JSX.Element => {
 
                   changeDetailItem(deltaX < 0 ? 1 : -1);
                 }}
-                onPointerCancel={() => {
+                onPointerCancel={(event) => {
+                  event.stopPropagation();
+                  if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+                    event.currentTarget.releasePointerCapture(event.pointerId);
+                  }
                   detailSwipeRef.current = null;
                 }}
+                onTouchMove={(event) => event.stopPropagation()}
               >
                 <div
                   className="item-detail-card-rail"
@@ -3395,8 +3499,8 @@ export const HomeDefault = (): JSX.Element => {
                 <button
                   type="button"
                   className="terms-start-button"
-                  disabled={!isAllRequiredAgreed}
-                  aria-disabled={!isAllRequiredAgreed}
+                  disabled={!isAllRequiredAgreed || isTermsAgreementLoading}
+                  aria-disabled={!isAllRequiredAgreed || isTermsAgreementLoading}
                   onClick={startHome}
                 >
                   시작하기
