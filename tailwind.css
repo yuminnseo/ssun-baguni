@@ -934,7 +934,7 @@ body {
   left: 50%;
   letter-spacing: var(--label-large-letter-spacing);
   line-height: var(--label-large-line-height);
-  max-width: calc(100vw - 40px);
+  max-width: none;
   padding: 12px 16px 12px 12px;
   position: fixed;
   text-align: center;
@@ -1964,8 +1964,8 @@ body {
 @media (max-width: 480px) {
   .login-required-toast {
     left: 50%;
-    max-width: calc(100vw - 40px);
-    width: fit-content;
+    max-width: none;
+    width: max-content;
   }
 
   .item-flow-mobile-keyboard {
