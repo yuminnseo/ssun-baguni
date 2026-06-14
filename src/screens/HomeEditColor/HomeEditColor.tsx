@@ -359,7 +359,7 @@ export const HomeEditColor = (): JSX.Element => {
         </section>
       </section>
       <section
-        className="flex flex-col items-center justify-center pt-6 pb-3 px-5 fixed bottom-[88px] left-0 z-[10] w-full"
+        className="flex flex-col items-center justify-center pt-6 pb-3 px-5 fixed bottom-[84px] left-0 z-[10] w-full"
         aria-label="색상 선택"
       >
         <div

@@ -611,6 +611,7 @@ export const HomeDefault = (): JSX.Element => {
     railOffset,
     railRef,
     railStyle,
+    cancelDrag,
     selectIndex,
     selectedIndex,
     setItemRef,
@@ -2238,18 +2239,24 @@ export const HomeDefault = (): JSX.Element => {
     if (!visualViewport) return;
 
     const updateKeyboardOffset = () => {
-      const viewportBottom = visualViewport.offsetTop + visualViewport.height;
-      const nextOffset = Math.max(0, window.innerHeight - viewportBottom);
+      const nextOffset = Math.max(
+        0,
+        window.innerHeight - visualViewport.height - visualViewport.offsetTop,
+      );
       setKeyboardOffset(Math.round(nextOffset));
     };
 
     updateKeyboardOffset();
     visualViewport.addEventListener("resize", updateKeyboardOffset);
     visualViewport.addEventListener("scroll", updateKeyboardOffset);
+    window.addEventListener("focusin", updateKeyboardOffset);
+    window.addEventListener("focusout", updateKeyboardOffset);
 
     return () => {
       visualViewport.removeEventListener("resize", updateKeyboardOffset);
       visualViewport.removeEventListener("scroll", updateKeyboardOffset);
+      window.removeEventListener("focusin", updateKeyboardOffset);
+      window.removeEventListener("focusout", updateKeyboardOffset);
       setKeyboardOffset(0);
     };
   }, [itemFlowStep]);
@@ -2633,7 +2640,10 @@ export const HomeDefault = (): JSX.Element => {
               className="login-required-toast-icon"
               src="/icons/icon-sparkle.svg"
             />
-            <span>{`사진을 준비 중이에요${".".repeat(photoPreparingDotCount)}`}</span>
+            <span>사진을 준비 중이에요</span>
+            <span className="photo-preparing-toast-dots">
+              {".".repeat(photoPreparingDotCount)}
+            </span>
           </div>
         )}
       </main>
@@ -2735,8 +2745,16 @@ export const HomeDefault = (): JSX.Element => {
               className="inline-flex items-center gap-1 relative flex-[0_0_auto]"
               role="tablist"
               aria-label="보기 전환"
-              onPointerDown={(event) => event.stopPropagation()}
-              onTouchStart={(event) => event.stopPropagation()}
+              onPointerDownCapture={(event) => {
+                event.stopPropagation();
+                cancelDrag();
+              }}
+              onPointerUpCapture={(event) => event.stopPropagation()}
+              onTouchStartCapture={(event) => {
+                event.stopPropagation();
+                cancelDrag();
+              }}
+              onTouchEndCapture={(event) => event.stopPropagation()}
             >
               {tabs.map((tab) => {
                 const isActive = tab.id === activeView;
@@ -2747,13 +2765,22 @@ export const HomeDefault = (): JSX.Element => {
                   type="button"
                   role="tab"
                   aria-selected={isActive}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onTouchStart={(event) => event.stopPropagation()}
+                  onPointerDownCapture={(event) => {
+                    event.stopPropagation();
+                    cancelDrag();
+                  }}
+                  onPointerUpCapture={(event) => event.stopPropagation()}
+                  onTouchStartCapture={(event) => {
+                    event.stopPropagation();
+                    cancelDrag();
+                  }}
+                  onTouchEndCapture={(event) => event.stopPropagation()}
                   onClick={(event) => {
                     event.stopPropagation();
+                    cancelDrag();
                     switchView(tab.id as "cart" | "receipt");
                   }}
-                  className={`inline-flex items-center justify-center gap-2 px-3 py-1.5 relative flex-[0_0_auto] rounded-full ${
+                  className={`inline-flex items-center justify-center gap-2 px-3 py-1.5 relative flex-[0_0_auto] rounded-full touch-manipulation ${
                     isActive ? "bg-white tab-active-shadow" : ""
                   }`}
                 >

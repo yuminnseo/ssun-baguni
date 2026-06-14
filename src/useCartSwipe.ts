@@ -205,6 +205,12 @@ export const useCartSwipe = (
     }
   };
 
+  const cancelDrag = useCallback(() => {
+    dragRef.current.active = false;
+    setIsDragging(false);
+    setDragOffset(0);
+  }, []);
+
   const dragHandleProps = {
     onPointerCancel: endDrag,
     onPointerDown: (event: PointerEvent<HTMLElement>) => {
@@ -243,6 +249,7 @@ export const useCartSwipe = (
     railStyle,
     railRef,
     railOffset: baseOffset + dragOffset,
+    cancelDrag,
     selectedIndex,
     selectIndex,
     snapIndex,
