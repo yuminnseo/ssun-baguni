@@ -2726,11 +2726,13 @@ export const HomeDefault = (): JSX.Element => {
               className="login-required-toast-icon"
               src="/icons/icon-sparkle.svg"
             />
-            <span className="photo-preparing-toast-text">
-              사진을 준비 중이에요
-            </span>
-            <span className="photo-preparing-toast-dots">
-              {".".repeat(photoPreparingDotCount)}
+            <span className="photo-preparing-toast-copy">
+              <span className="photo-preparing-toast-text">
+                사진을 준비 중이에요
+              </span>
+              <span className="photo-preparing-toast-dots">
+                {".".repeat(photoPreparingDotCount)}
+              </span>
             </span>
           </div>
         )}

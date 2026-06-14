@@ -937,34 +937,52 @@ body {
   position: fixed;
   text-align: center;
   transform: translate3d(-50%, 20px, 0);
-  white-space: nowrap;
   width: fit-content;
   word-break: keep-all;
   z-index: 25;
 }
 
 .login-required-toast span {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
   overflow: visible;
+  overflow-wrap: break-word;
   text-overflow: clip;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: keep-all;
 }
 
 .photo-preparing-toast {
   animation: login-required-toast-in 180ms ease both;
 }
 
+.photo-preparing-toast-copy {
+  align-items: center;
+  display: inline-flex;
+  gap: 0;
+  max-width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+}
+
 .photo-preparing-toast-text {
   flex: 0 0 auto;
+  margin: 0;
   min-width: max-content;
   overflow: visible;
+  padding: 0;
   text-overflow: clip;
+  white-space: nowrap;
 }
 
 .photo-preparing-toast-dots {
   display: inline-block;
   flex: 0 0 1.5em;
+  margin-left: 0;
   min-width: 1.5em;
   overflow: visible;
+  padding-left: 0;
   text-align: left;
   white-space: nowrap;
 }
