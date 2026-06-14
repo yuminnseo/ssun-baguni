@@ -445,14 +445,14 @@ const navItems = [
     id: "home",
     label: "홈",
     iconAlt: "Icon navigation home",
-    iconSrc: "https://c.animaapp.com/RVtpFFFT/img/icon-navigation-home-2.svg",
+    iconSrc: "/navigation-icons/icon-home-fill.svg",
     active: true,
   },
   {
     id: "calendar",
     label: "캘린더",
     iconAlt: "Icon navigation",
-    iconSrc: "https://c.animaapp.com/RVtpFFFT/img/icon-navigation-calendar.svg",
+    iconSrc: "/navigation-icons/icon-calendar-line.svg",
     active: false,
     disabled: true,
   },
@@ -460,7 +460,7 @@ const navItems = [
     id: "friends",
     label: "친구",
     iconAlt: "Icon navigation",
-    iconSrc: "https://c.animaapp.com/RVtpFFFT/img/icon-navigation-social-2.svg",
+    iconSrc: "/navigation-icons/icon-social-line.svg",
     active: false,
     disabled: true,
   },
@@ -468,8 +468,7 @@ const navItems = [
     id: "my",
     label: "My",
     iconAlt: "Icon navigation my",
-    iconSrc:
-      "https://c.animaapp.com/RVtpFFFT/img/icon-navigation-my-page-2.svg",
+    iconSrc: "/navigation-icons/icon-my-line.svg",
     active: false,
     disabled: true,
   },
@@ -2222,12 +2221,21 @@ export const HomeDefault = (): JSX.Element => {
                     onClick={() => setIsItemDatePickerOpen(true)}
                   >
                     <span className="item-flow-select-value">{itemDate}</span>
-                    <img
-                      alt=""
+                    <svg
                       aria-hidden="true"
                       className="item-flow-select-chevron"
-                      src="https://c.animaapp.com/TR7Q5H5X/img/--icon-variant---2.svg"
-                    />
+                      fill="none"
+                      viewBox="0 0 20 20"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M5 7.5L10 12.5L15 7.5"
+                        stroke="#27272A"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="1.8"
+                      />
+                    </svg>
                   </button>
                 </div>
                 <button
@@ -2236,12 +2244,21 @@ export const HomeDefault = (): JSX.Element => {
                   onClick={openItemTimePicker}
                 >
                   <span className="item-flow-select-value">{itemTime}</span>
-                  <img
-                    alt=""
+                  <svg
                     aria-hidden="true"
                     className="item-flow-select-chevron"
-                    src="https://c.animaapp.com/TR7Q5H5X/img/--icon-variant---2.svg"
-                  />
+                    fill="none"
+                    viewBox="0 0 20 20"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M5 7.5L10 12.5L15 7.5"
+                      stroke="#27272A"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.8"
+                    />
+                  </svg>
                 </button>
               </div>
               <section className="item-flow-field-group">
@@ -2530,7 +2547,7 @@ export const HomeDefault = (): JSX.Element => {
               alt=""
               aria-hidden="true"
               className="login-required-toast-icon"
-              src="/public/icons/icon-sparkle.svg"
+              src="/icons/icon-sparkle.svg"
             />
             <span>사진을 준비 중이에요.</span>
           </div>
@@ -2763,7 +2780,7 @@ export const HomeDefault = (): JSX.Element => {
                                   alt=""
                                   aria-hidden="true"
                                   className="login-google-icon"
-                                  src="/public/color-icons/icon-color-google.svg"
+                                  src="/color-icons/icon-color-google.svg"
                                 />
                                 <span>구글 계정으로 로그인</span>
                               </button>
@@ -2926,11 +2943,21 @@ export const HomeDefault = (): JSX.Element => {
               <div className="p-4 bg-[#111111] rounded-full inline-flex items-center justify-center relative flex-[0_0_auto] bottom-plus-shadow">
                 <div className="inline-flex items-center relative flex-[0_0_auto]">
                   <div className="inline-flex flex-col items-center justify-center relative flex-[0_0_auto]">
-                    <img
-                      className="relative h-5"
-                      alt="Icon variant"
-                      src="https://c.animaapp.com/RVtpFFFT/img/--icon-variant---8.svg"
-                    />
+                    <svg
+                      aria-hidden="true"
+                      className="relative h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 20 20"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M10 4V16M4 10H16"
+                        stroke="#FFFFFF"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                      />
+                    </svg>
                   </div>
                 </div>
               </div>
@@ -3262,7 +3289,7 @@ export const HomeDefault = (): JSX.Element => {
             alt=""
             aria-hidden="true"
             className="login-required-toast-icon"
-            src="/public/icons/icon-sparkle.svg"
+            src="/icons/icon-sparkle.svg"
           />
           <span>이 기능을 사용하려면 로그인이 필요해요.</span>
         </div>
@@ -3273,7 +3300,7 @@ export const HomeDefault = (): JSX.Element => {
             alt=""
             aria-hidden="true"
             className="login-required-toast-icon"
-            src="/public/icons/icon-sparkle.svg"
+            src="/icons/icon-sparkle.svg"
           />
           <span>{actionFailureToastMessage}</span>
         </div>
@@ -3284,7 +3311,7 @@ export const HomeDefault = (): JSX.Element => {
             alt=""
             aria-hidden="true"
             className="login-required-toast-icon"
-            src="/public/icons/icon-sparkle.svg"
+            src="/icons/icon-sparkle.svg"
           />
           <span>배경 제거에 실패했어요. 원본 이미지로 저장했어요.</span>
         </div>
