@@ -359,7 +359,7 @@ export const HomeEditColor = (): JSX.Element => {
         </section>
       </section>
       <section
-        className="flex flex-col items-center justify-center pt-6 pb-3 px-5 fixed bottom-[84px] left-0 z-[10] w-full"
+        className="app-shell-fixed-x flex flex-col items-center justify-center pt-6 pb-3 px-5 fixed bottom-[84px] z-[10]"
         aria-label="색상 선택"
       >
         <div
@@ -446,7 +446,7 @@ export const HomeEditColor = (): JSX.Element => {
           })}
         </div>
       </section>
-      <footer className="flex flex-col items-start fixed bottom-0 left-0 z-[10] w-full bg-white">
+      <footer className="app-shell-fixed-x flex flex-col items-start fixed bottom-0 z-[10] bg-white">
         <div className="flex items-center p-5 self-stretch w-full relative flex-[0_0_auto]">
           <div className="flex w-full items-center gap-2 relative">
             <Link

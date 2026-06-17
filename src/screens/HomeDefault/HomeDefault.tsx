@@ -565,6 +565,7 @@ export const HomeDefault = (): JSX.Element => {
   const photoPreparingToastTimerRef = useRef<number | null>(null);
   const photoPreparingDotsTimerRef = useRef<number | null>(null);
   const actionFailureToastTimerRef = useRef<number | null>(null);
+  const preloadedCartImageSrcsRef = useRef<Set<string>>(new Set());
   const detailGradientRef = useRef<Record<string, string>>({});
   const detailSwipeRef = useRef<{ startX: number; startY: number } | null>(null);
   const appOpenedTrackedRef = useRef(false);
@@ -632,18 +633,27 @@ export const HomeDefault = (): JSX.Element => {
     );
   const viewRailStyle =
     transitionPhase === "idle" ? railStyle : { ...railStyle, transition: "none" };
-  const visibleDateKeys = useMemo(() => {
-    const indexes = visibleIndexes.length > 0 ? visibleIndexes : [selectedIndex];
+  const preparedCartIndexes = useMemo(() => {
+    const indexes = new Set<number>();
+    const startIndex = Math.max(selectedIndex - 2, 0);
+    const endIndex = Math.min(selectedIndex + 2, dateCarts.length - 1);
+
+    for (let index = startIndex; index <= endIndex; index += 1) {
+      indexes.add(index);
+    }
+
+    return indexes;
+  }, [dateCarts.length, selectedIndex]);
+  const preparedDateKeys = useMemo(() => {
+    const dateKeys = Array.from(preparedCartIndexes)
+      .map((index) => dateCarts[index]?.dateKey)
+      .filter((dateKey): dateKey is string => Boolean(dateKey));
 
     return Array.from(
-      new Set(
-        indexes
-          .map((index) => dateCarts[index]?.dateKey)
-          .filter((dateKey): dateKey is string => Boolean(dateKey)),
-      ),
+      new Set(dateKeys),
     ).sort((first, second) => first.localeCompare(second));
-  }, [dateCarts, selectedIndex, visibleIndexes]);
-  const visibleDateRangeKey = visibleDateKeys.join("|");
+  }, [dateCarts, preparedCartIndexes]);
+  const preparedDateRangeKey = preparedDateKeys.join("|");
   const isCartDataResolved = (dateKey: string) =>
     !isAuthReady
       ? false
@@ -743,6 +753,31 @@ export const HomeDefault = (): JSX.Element => {
 
     return "manual";
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const startIndex = Math.max(selectedIndex - 2, 0);
+    const endIndex = Math.min(selectedIndex + 2, dateCarts.length - 1);
+    const srcs = new Set<string>();
+
+    for (let index = startIndex; index <= endIndex; index += 1) {
+      const src = dateCarts[index]?.imageSrc;
+      if (src) srcs.add(src);
+    }
+
+    srcs.forEach((src) => {
+      if (preloadedCartImageSrcsRef.current.has(src)) return;
+
+      preloadedCartImageSrcsRef.current.add(src);
+      const image = new Image();
+      image.decoding = "async";
+      image.loading = "eager";
+      image.src = src;
+      image.decode?.().catch(() => undefined);
+    });
+  }, [dateCarts, selectedIndex]);
+
   const getFrozenRailStyle = () => {
     const rail = railRef.current;
     const computedTransform = rail
@@ -2030,7 +2065,7 @@ export const HomeDefault = (): JSX.Element => {
       return;
     }
 
-    const dateKeys = visibleDateRangeKey
+    const dateKeys = preparedDateRangeKey
       .split("|")
       .filter((dateKey) => dateKey.length > 0);
     const startDateKey = dateKeys[0];
@@ -2124,7 +2159,7 @@ export const HomeDefault = (): JSX.Element => {
     isAuthReady,
     isAuthenticated,
     user?.id,
-    visibleDateRangeKey,
+    preparedDateRangeKey,
   ]);
 
   useEffect(() => {
@@ -2922,6 +2957,8 @@ export const HomeDefault = (): JSX.Element => {
                       ? { totalAmount: 0 }
                       : getDisplayCartSummary(cart.id, cart.dateKey);
                     const displayItems = getDisplayCartItems(cart.id, cart.dateKey);
+                    const shouldPrepareCartImage =
+                      Math.abs(index - selectedIndex) <= 2;
 
                     return (
                       <article
@@ -2973,7 +3010,8 @@ export const HomeDefault = (): JSX.Element => {
                           <img
                             className="relative h-full w-full object-cover"
                             alt={cart.imageAlt}
-                            loading="lazy"
+                            decoding="async"
+                            loading={shouldPrepareCartImage ? "eager" : "lazy"}
                             src={cart.imageSrc}
                           />
                           {isLoggedOutStart ? (
@@ -2993,7 +3031,7 @@ export const HomeDefault = (): JSX.Element => {
                                 <span>구글 계정으로 로그인</span>
                               </button>
                             </div>
-                          ) : visibleIndexes.includes(index) && (
+                          ) : preparedCartIndexes.has(index) && (
                             <CartSlotItems
                               key={`${cart.id}-${cartDataVersion}`}
                               cartId={cart.id}
@@ -3090,7 +3128,7 @@ export const HomeDefault = (): JSX.Element => {
           </div>
         </div>
       </section>
-      <footer className="flex flex-col items-start fixed bottom-0 left-0 z-[10] w-full">
+      <footer className="app-shell-fixed-x flex flex-col items-start fixed bottom-0 z-[10]">
         <div className="flex-col items-start self-stretch w-full flex-[0_0_auto] flex px-5 pt-0 relative bottom-navigation-safe-area">
           <div className="justify-center self-stretch w-full flex-[0_0_auto] flex items-center gap-3 relative">
             <nav
@@ -3349,7 +3387,7 @@ export const HomeDefault = (): JSX.Element => {
       )}
       {isAddSheetOpen && (
         <section
-          className="h-full items-end fixed top-0 left-0 flex w-full z-[20]"
+          className="app-shell-fixed-x h-full items-end fixed top-0 flex z-[20]"
           aria-label="사진 업로드 옵션"
           onClick={closeAddSheet}
         >
