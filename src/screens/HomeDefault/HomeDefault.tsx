@@ -2745,7 +2745,7 @@ export const HomeDefault = (): JSX.Element => {
       className="flex flex-col min-h-screen items-start relative bg-white"
       data-model-id="2352:157735"
     >
-      <header className="flex items-center justify-around gap-[104px] px-5 py-2 fixed top-0 left-0 z-[10] w-full bg-white">
+      <header className="app-shell-fixed-x flex items-center justify-around gap-[104px] px-5 py-2 fixed top-0 z-[10] bg-white">
         <div className="flex items-center justify-between relative flex-1 grow">
           <div className="inline-flex items-center gap-3 relative flex-[0_0_auto]">
             <button
@@ -2819,7 +2819,7 @@ export const HomeDefault = (): JSX.Element => {
         className="flex flex-col items-start relative flex-1 self-stretch w-full grow pt-20 pb-[112px]"
         aria-label="장바구니 화면"
       >
-        <div className="segment-control-scrim flex flex-col items-center justify-center px-5 py-2 fixed top-10 left-0 z-[10] w-full">
+        <div className="app-shell-fixed-x segment-control-scrim flex flex-col items-center justify-center px-5 py-2 fixed top-10 z-[10]">
           <div
             className="flex w-full h-full items-center gap-2.5 absolute top-0 left-0 pointer-events-none"
             aria-hidden="true"
@@ -2905,7 +2905,7 @@ export const HomeDefault = (): JSX.Element => {
             >
               <div
                 ref={transitionPhase === "cart-to-receipt" ? undefined : railRef}
-                className="w-[375px] justify-end px-7 py-0 ml-[-20.00px] mr-[-20.00px] flex items-center gap-3 min-[541px]:gap-10 min-[1190px]:gap-20 relative"
+                className="w-[375px] justify-end px-7 py-0 ml-[-20.00px] mr-[-20.00px] flex items-center gap-3 min-[460px]:gap-12 min-[670px]:gap-24 relative"
                 style={
                   isLoggedOutStart
                     ? { transform: "none", transition: "none" }
@@ -3074,7 +3074,7 @@ export const HomeDefault = (): JSX.Element => {
                   <span />
                 </span>
                 <span className="home-page-footer-link">
-                  abcdef@google.com
+                  carrotvalue@gmail.com
                 </span>
               </div>
             </div>

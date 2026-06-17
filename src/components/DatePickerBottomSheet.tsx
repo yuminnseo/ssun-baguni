@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState, type TouchEvent, type WheelEvent } from "react";
 
 const SHEET_ANIMATION_MS = 220;
 const DAYS_IN_WEEK = 7;
@@ -83,6 +83,32 @@ export const DatePickerBottomSheet = ({
   );
   const calendarWeeks = getCalendarWeeks(displayMonth);
 
+  useEffect(() => {
+    if (typeof document === "undefined" || typeof window === "undefined") return;
+
+    const scrollY = window.scrollY;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyPosition = document.body.style.position;
+    const previousBodyTop = document.body.style.top;
+    const previousBodyWidth = document.body.style.width;
+    const previousBodyTouchAction = document.body.style.touchAction;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+    document.body.style.touchAction = "none";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.position = previousBodyPosition;
+      document.body.style.top = previousBodyTop;
+      document.body.style.width = previousBodyWidth;
+      document.body.style.touchAction = previousBodyTouchAction;
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
+
   const changeMonth = (direction: -1 | 1) => {
     setDisplayMonth(
       (currentMonth) =>
@@ -107,11 +133,20 @@ export const DatePickerBottomSheet = ({
     }
   };
 
+  const blockBackgroundScroll = (
+    event: TouchEvent<HTMLElement> | WheelEvent<HTMLElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
   return (
     <section
       className="date-picker-overlay"
       aria-label="날짜 선택 바텀시트"
       onClick={closeSheet}
+      onTouchMove={blockBackgroundScroll}
+      onWheel={blockBackgroundScroll}
     >
       <div
         className={`date-picker-backdrop ${
@@ -127,6 +162,8 @@ export const DatePickerBottomSheet = ({
         aria-modal="true"
         aria-label="날짜 선택"
         onClick={(event) => event.stopPropagation()}
+        onTouchMove={(event) => event.stopPropagation()}
+        onWheel={(event) => event.stopPropagation()}
       >
         <div className="flex w-full flex-col items-center overflow-hidden rounded-[16px_16px_0px_0px] px-5 py-2">
           <div

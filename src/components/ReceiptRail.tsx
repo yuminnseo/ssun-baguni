@@ -53,7 +53,7 @@ const perforationText =
   "* * * * * * * * * * * * * * * * * * * * * * * * * * *";
 
 const itemTimes = ["09:12", "10:11", "12:14", "21:21"];
-const receiptRenderRadius = 2;
+const RECEIPT_RENDER_RADIUS = 2;
 
 const getReceiptColor = (cart: ReceiptCart) =>
   cart.imageAlt.toLowerCase().includes("red")
@@ -99,24 +99,15 @@ export const ReceiptRail = ({
     startX: number;
     startY: number;
   } | null>(null);
-  const renderedReceiptIndexes = useMemo(() => {
-    const startIndex = clamp(selectedIndex - receiptRenderRadius, 0, carts.length - 1);
-    const endIndex = clamp(selectedIndex + receiptRenderRadius, 0, carts.length - 1);
-    const indexes = new Set<number>();
+  const renderedReceiptRange = useMemo(() => {
+    const maxIndex = Math.max(carts.length - 1, 0);
 
-    for (let index = startIndex; index <= endIndex; index += 1) {
-      indexes.add(index);
-    }
-
-    return indexes;
+    return {
+      endIndex: clamp(selectedIndex + RECEIPT_RENDER_RADIUS, 0, maxIndex),
+      startIndex: clamp(selectedIndex - RECEIPT_RENDER_RADIUS, 0, maxIndex),
+    };
   }, [carts.length, selectedIndex]);
-  const renderedReceiptIdsKey = useMemo(
-    () =>
-      carts
-        .flatMap((cart, index) => (renderedReceiptIndexes.has(index) ? [cart.id] : []))
-        .join(","),
-    [carts, renderedReceiptIndexes],
-  );
+  const renderedReceiptWindowKey = `${renderedReceiptRange.startIndex}:${renderedReceiptRange.endIndex}`;
 
   const updateCardOffset = (cardId: string, deltaY: number) => {
     setCardOffsetsY((currentOffsets) => ({
@@ -317,8 +308,12 @@ export const ReceiptRail = ({
 
     return () => {
       cleanupCallbacks.forEach((cleanup) => cleanup());
+      if (wheelSettleTimerRef.current !== null) {
+        window.clearTimeout(wheelSettleTimerRef.current);
+        wheelSettleTimerRef.current = null;
+      }
     };
-  }, [carts, renderedReceiptIdsKey]);
+  }, [renderedReceiptWindowKey]);
 
   const endCardDrag = (event: PointerEvent<HTMLDivElement>) => {
     if (cardDragRef.current.mode === "idle") return;
@@ -364,7 +359,9 @@ export const ReceiptRail = ({
         style={railStyle}
       >
         {carts.map((cart, index) => {
-        const shouldRenderReceipt = renderedReceiptIndexes.has(index);
+        const shouldRenderReceipt =
+          index >= renderedReceiptRange.startIndex &&
+          index <= renderedReceiptRange.endIndex;
 
         if (!shouldRenderReceipt) {
           return (

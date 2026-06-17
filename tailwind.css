@@ -48,6 +48,9 @@ body::-webkit-scrollbar {
 
 :root {
   --font-base: "Satoshi", "Pretendard", Helvetica, sans-serif;
+  --app-max-width: 834px;
+  --app-shell-width: min(100vw, var(--app-max-width));
+  --app-shell-gutter: max(0px, calc((100vw - var(--app-max-width)) / 2));
   --body-large-font-family: var(--font-base);
   --body-large-font-size: 17px;
   --body-large-font-style: normal;
@@ -148,9 +151,21 @@ body::-webkit-scrollbar {
 
 html,
 body {
+  background: #f4f4f5;
   font-family: var(--font-base);
+  min-height: 100%;
   overflow-x: hidden;
   -ms-overflow-style: none;
+}
+
+#app {
+  background: #ffffff;
+  margin: 0 auto;
+  max-width: var(--app-max-width);
+  min-height: 100dvh;
+  overflow-x: hidden;
+  position: relative;
+  width: var(--app-shell-width);
 }
 
 .animate-fade-in {
@@ -229,7 +244,17 @@ body {
 }
 
 .bottom-navigation-safe-area {
+  margin-left: auto;
+  margin-right: auto;
   padding-bottom: max(24px, env(safe-area-inset-bottom));
+  max-width: var(--app-max-width);
+  width: var(--app-shell-width);
+}
+
+.app-shell-fixed-x {
+  left: var(--app-shell-gutter);
+  right: var(--app-shell-gutter);
+  width: auto;
 }
 
 .bottom-nav-item-disabled {
@@ -303,31 +328,34 @@ body {
   backface-visibility: hidden;
   pointer-events: none;
   position: fixed;
-  left: 0;
-  right: 0;
+  left: var(--app-shell-gutter);
+  right: var(--app-shell-gutter);
   top: 80px;
+  width: auto;
   z-index: 2;
 }
 
 .cart-main-enter {
   animation: cart-main-enter 820ms cubic-bezier(0.2, 0.85, 0.2, 1) both;
   backface-visibility: hidden;
-  left: 0;
+  left: var(--app-shell-gutter);
   pointer-events: none;
   position: fixed;
-  right: 0;
+  right: var(--app-shell-gutter);
   top: 80px;
+  width: auto;
   z-index: 1;
 }
 
 .cart-main-prep {
-  left: 0;
+  left: var(--app-shell-gutter);
   pointer-events: none;
   position: fixed;
-  right: 0;
+  right: var(--app-shell-gutter);
   top: 80px;
   transform: translate3d(0, calc(100dvh + 260px), 0) scale(0.98);
   visibility: hidden;
+  width: auto;
   z-index: 1;
 }
 
@@ -350,35 +378,38 @@ body {
 
 .receipt-main-prep {
   backface-visibility: hidden;
-  left: 0;
+  left: var(--app-shell-gutter);
   pointer-events: none;
   position: fixed;
-  right: calc(100vw - 100%);
+  right: var(--app-shell-gutter);
   top: 80px;
   transform: translate3d(0, calc(-100dvh - 180px), 0);
   visibility: hidden;
+  width: auto;
   z-index: 9;
 }
 
 .receipt-main-enter {
   animation: receipt-main-enter 620ms cubic-bezier(0.19, 1, 0.22, 1) both;
   backface-visibility: hidden;
-  left: 0;
+  left: var(--app-shell-gutter);
   pointer-events: none;
   position: fixed;
-  right: calc(100vw - 100%);
+  right: var(--app-shell-gutter);
   top: 80px;
+  width: auto;
   z-index: 9;
 }
 
 .receipt-main-exit {
   animation: receipt-main-exit 420ms cubic-bezier(0.48, 0, 0.72, 1) both;
   backface-visibility: hidden;
-  left: 0;
+  left: var(--app-shell-gutter);
   pointer-events: none;
   position: fixed;
-  right: calc(100vw - 100%);
+  right: var(--app-shell-gutter);
   top: 80px;
+  width: auto;
   z-index: 9;
 }
 
@@ -728,10 +759,12 @@ body {
   align-items: flex-end;
   display: flex;
   height: 100%;
-  inset: 0;
+  bottom: 0;
+  left: var(--app-shell-gutter);
   overflow: hidden;
   position: fixed;
-  width: 100%;
+  right: var(--app-shell-gutter);
+  top: 0;
   z-index: 30;
 }
 
@@ -1015,10 +1048,12 @@ body {
   align-items: flex-end;
   display: flex;
   height: 100%;
-  inset: 0;
+  bottom: 0;
+  left: var(--app-shell-gutter);
   overflow: hidden;
   position: fixed;
-  width: 100%;
+  right: var(--app-shell-gutter);
+  top: 0;
   z-index: 30;
 }
 
@@ -1452,10 +1487,12 @@ body {
   align-items: flex-end;
   display: flex;
   height: 100%;
-  inset: 0;
+  bottom: 0;
+  left: var(--app-shell-gutter);
   overflow: hidden;
   position: fixed;
-  width: 100%;
+  right: var(--app-shell-gutter);
+  top: 0;
   z-index: 40;
 }
 
@@ -1581,9 +1618,9 @@ body {
   bottom: calc(
     var(--item-flow-keyboard-offset, 0px) + env(safe-area-inset-bottom) + 12px
   );
-  left: 0;
+  left: var(--app-shell-gutter);
   position: fixed;
-  right: 0;
+  right: var(--app-shell-gutter);
   z-index: 35;
 }
 
@@ -1723,12 +1760,14 @@ body {
 .item-detail-overlay {
   animation: item-detail-overlay-in 260ms ease both;
   background: rgba(255, 255, 255, 0.97);
-  inset: 0;
+  bottom: 0;
+  left: var(--app-shell-gutter);
   overscroll-behavior: contain;
   overflow: hidden;
   position: fixed;
+  right: var(--app-shell-gutter);
+  top: 0;
   touch-action: none;
-  width: 100%;
   z-index: 40;
 }
 

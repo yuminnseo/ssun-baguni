@@ -239,7 +239,7 @@ export const HomeEditColor = (): JSX.Element => {
       aria-label="장바구니 색상 변경 화면"
       className="flex min-h-screen flex-col items-start relative bg-white overflow-hidden"
     >
-      <header className="flex items-center justify-around gap-[104px] px-5 py-2 fixed top-0 left-0 z-[10] w-full bg-white">
+      <header className="app-shell-fixed-x flex items-center justify-around gap-[104px] px-5 py-2 fixed top-0 z-[10] bg-white">
         <div className="flex items-center justify-between relative flex-1 grow">
           <div
             className="inline-flex items-center gap-1 px-0 py-0.5 relative flex-[0_0_auto]"
@@ -267,7 +267,7 @@ export const HomeEditColor = (): JSX.Element => {
         className="flex flex-col items-start relative flex-1 self-stretch w-full grow pt-20 pb-[164px]"
         aria-label="색상 변경 미리보기"
       >
-        <div className="segment-control-scrim flex flex-col items-center justify-center px-5 py-2 fixed top-10 left-0 z-[10] w-full">
+        <div className="app-shell-fixed-x segment-control-scrim flex flex-col items-center justify-center px-5 py-2 fixed top-10 z-[10]">
           <div
             className="flex w-full h-full items-center gap-2.5 absolute top-0 left-0"
             aria-hidden="true"
