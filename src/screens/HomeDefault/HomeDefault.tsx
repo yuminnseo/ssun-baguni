@@ -40,6 +40,7 @@ import {
   listItemsInDateRange,
   updateItem,
 } from "../../lib/data/items";
+import { deleteCurrentAccount } from "../../lib/functions/deleteAccount";
 import { removeItemBackground } from "../../lib/functions/removeItemBackground";
 import {
   deleteNoSpendDay,
@@ -59,6 +60,7 @@ import type {
 import { useAuth } from "../../lib/auth";
 import {
   analyticsEvents,
+  flushAnalytics,
   getFileSizeBucket,
   getPriceRange,
   identifyUser,
@@ -163,8 +165,15 @@ const writeTermsAgreement = (userId: string) => {
   window.localStorage.setItem(getTermsAgreementStorageKey(userId), "true");
 };
 
+const removeTermsAgreement = (userId: string) => {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.removeItem(getTermsAgreementStorageKey(userId));
+};
+
 type RequiredAgreementKey = "age" | "privacy" | "terms";
 type ItemFlowStep = "price" | "details" | null;
+type WithdrawStep = "warning" | "final";
 
 const requiredAgreementItems: Array<{
   hasViewButton?: boolean;
@@ -511,6 +520,11 @@ export const HomeDefault = (): JSX.Element => {
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const [isTermsAgreementLoading, setIsTermsAgreementLoading] =
     useState(false);
+  const [isWithdrawSheetOpen, setIsWithdrawSheetOpen] = useState(false);
+  const [withdrawStep, setWithdrawStep] = useState<WithdrawStep>("warning");
+  const [hasConfirmedWithdrawWarning, setHasConfirmedWithdrawWarning] =
+    useState(false);
+  const [isWithdrawProcessing, setIsWithdrawProcessing] = useState(false);
   const [itemFlowStep, setItemFlowStep] = useState<ItemFlowStep>(null);
   const [selectedItemImageFile, setSelectedItemImageFile] =
     useState<File | null>(null);
@@ -580,6 +594,7 @@ export const HomeDefault = (): JSX.Element => {
   const priceEnteredTrackedRef = useRef(false);
   const priceStepViewedRef = useRef(false);
   const termsSheetViewedRef = useRef(false);
+  const withdrawWarningTrackedRef = useRef(false);
   const queryParams = new URLSearchParams(location.search);
   const querySelectedIndex = Number(queryParams.get("selectedIndex"));
   const querySelectedDate = queryParams.get("selectedDate");
@@ -742,6 +757,28 @@ export const HomeDefault = (): JSX.Element => {
     item_count_for_date: getSelectedCartSummary().itemCount,
     selected_date: cartDates[selectedIndex],
   });
+  const getWithdrawAnalyticsProperties = (step?: WithdrawStep | "result") => {
+    const itemCount = Object.values(dbCartData.slotItemsByDate).reduce(
+      (count, items) => count + items.length,
+      0,
+    );
+    const noSpendDayCount = new Set([
+      ...Array.from(dbCartData.noSpendDateKeys),
+      ...dateCarts
+        .filter((cart) => noSpendCartIds.has(cart.id))
+        .map((cart) => cart.dateKey),
+    ]).size;
+
+    return {
+      source: "footer",
+      screen: "home",
+      item_count: itemCount,
+      has_items: itemCount > 0,
+      has_no_spend_days: noSpendDayCount > 0,
+      no_spend_day_count: noSpendDayCount,
+      step,
+    };
+  };
   const getDidChangeTime = () => itemTime !== itemFlowInitialTimeRef.current;
   const getItemFlowElapsedMs = () =>
     itemFlowStartedAtRef.current === null
@@ -1695,6 +1732,96 @@ export const HomeDefault = (): JSX.Element => {
       privacy: false,
       terms: false,
     });
+  };
+  const openWithdrawSheet = () => {
+    if (!isAuthenticated || !user?.id) return;
+
+    withdrawWarningTrackedRef.current = false;
+    setWithdrawStep("warning");
+    setHasConfirmedWithdrawWarning(false);
+    setIsWithdrawProcessing(false);
+    setIsWithdrawSheetOpen(true);
+    trackEvent(analyticsEvents.WITHDRAW_STARTED, {
+      ...getWithdrawAnalyticsProperties("warning"),
+    });
+  };
+  const closeWithdrawSheet = () => {
+    if (isWithdrawProcessing) return;
+
+    setIsWithdrawSheetOpen(false);
+    setWithdrawStep("warning");
+    setHasConfirmedWithdrawWarning(false);
+  };
+  const toggleWithdrawWarning = () => {
+    setHasConfirmedWithdrawWarning((currentValue) => {
+      const nextValue = !currentValue;
+
+      if (nextValue && !withdrawWarningTrackedRef.current) {
+        trackEvent(analyticsEvents.WITHDRAW_WARNING_CONFIRMED, {
+          ...getWithdrawAnalyticsProperties("warning"),
+        });
+        withdrawWarningTrackedRef.current = true;
+      }
+
+      return nextValue;
+    });
+  };
+  const moveToWithdrawFinalStep = () => {
+    if (!hasConfirmedWithdrawWarning || isWithdrawProcessing) return;
+
+    setWithdrawStep("final");
+  };
+  const submitWithdraw = async () => {
+    if (isWithdrawProcessing || !user?.id) return;
+
+    const withdrawingUserId = user.id;
+    setIsWithdrawProcessing(true);
+    trackEvent(analyticsEvents.WITHDRAW_FINAL_CLICKED, {
+      ...getWithdrawAnalyticsProperties("final"),
+    });
+
+    try {
+      await deleteCurrentAccount();
+      trackEvent(analyticsEvents.WITHDRAW_COMPLETED, {
+        ...getWithdrawAnalyticsProperties("result"),
+      });
+      await flushAnalytics();
+      resetAnalytics();
+      removeTermsAgreement(withdrawingUserId);
+      try {
+        await signOut();
+      } catch (signOutError) {
+        console.warn("Failed to sign out after account deletion.", signOutError);
+      }
+
+      setIsWithdrawSheetOpen(false);
+      setWithdrawStep("warning");
+      setHasConfirmedWithdrawWarning(false);
+      setIsWithdrawProcessing(false);
+      setHasAcceptedTerms(false);
+      setIsTermsSheetOpen(false);
+      setIsAddSheetOpen(false);
+      setIsClosingAddSheet(false);
+      setDetailOverlay(null);
+      setItemFlowStep(null);
+      setDbCartData({
+        loadedDateKeys: new Set(),
+        noSpendDateKeys: new Set(),
+        slotItemsByDate: {},
+        status: "idle",
+      });
+      setNoSpendCartIds(new Set());
+      showActionFailureToast("탈퇴가 완료되었어요.");
+      resetStartState();
+    } catch (error) {
+      console.error("Failed to withdraw account.", error);
+      trackEvent(analyticsEvents.WITHDRAW_FAILED, {
+        ...getWithdrawAnalyticsProperties("result"),
+        reason: error instanceof Error ? error.name || "error" : "unknown",
+      });
+      showActionFailureToast("탈퇴에 실패했어요. 다시 시도해주세요.");
+      setIsWithdrawProcessing(false);
+    }
   };
   const renderAgreementCheckIcon = (checked: boolean) => (
     <svg
@@ -3117,13 +3244,25 @@ export const HomeDefault = (): JSX.Element => {
               </div>
             </div>
             {!isLoggedOutStart && (
-              <button
-                type="button"
-                className="home-page-footer-logout"
-                onClick={logoutToStart}
-              >
-                로그아웃
-              </button>
+              <div className="home-page-footer-account-actions">
+                <button
+                  type="button"
+                  className="home-page-footer-logout"
+                  onClick={logoutToStart}
+                >
+                  로그아웃
+                </button>
+                <span className="home-page-footer-divider" aria-hidden="true">
+                  <span />
+                </span>
+                <button
+                  type="button"
+                  className="home-page-footer-withdraw"
+                  onClick={openWithdrawSheet}
+                >
+                  회원탈퇴
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -3448,6 +3587,93 @@ export const HomeDefault = (): JSX.Element => {
             </div>
             <div className="flex flex-col items-center justify-center relative self-stretch w-full flex-[0_0_auto]">
               <div className="flex flex-col items-center justify-center relative self-stretch w-full flex-[0_0_auto]" />
+            </div>
+          </div>
+        </section>
+      )}
+      {isWithdrawSheetOpen && (
+        <section
+          className="terms-sheet-overlay"
+          aria-label="회원탈퇴 확인"
+          role="dialog"
+          aria-modal="true"
+          onClick={closeWithdrawSheet}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            closeWithdrawSheet();
+          }}
+        >
+          <div className="terms-sheet-backdrop" aria-hidden="true" />
+          <div
+            className="terms-sheet-content withdraw-sheet-content"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="terms-sheet-handlebar">
+              <div className="terms-sheet-handlebar-mark" />
+            </div>
+            <div className="terms-sheet-container">
+              <div className="terms-sheet-content-slot">
+                <h2 className="terms-sheet-title">
+                  {withdrawStep === "warning"
+                    ? "정말 탈퇴하시겠어요?"
+                    : "정말로 탈퇴하시겠어요?"}
+                </h2>
+                <p className="withdraw-sheet-description">
+                  {isWithdrawProcessing
+                    ? "탈퇴 처리 중이에요..."
+                    : withdrawStep === "warning"
+                      ? "탈퇴하면 계정과 장바구니 기록, 영수증 기록, 업로드한 이미지가 삭제돼요. 삭제된 데이터는 복구할 수 없어요."
+                      : "탈퇴를 진행하면 모든 기록이 삭제되고 다시 복구할 수 없어요."}
+                </p>
+                {withdrawStep === "warning" && (
+                  <button
+                    type="button"
+                    className="terms-agreement-main withdraw-confirm-row"
+                    disabled={isWithdrawProcessing}
+                    onClick={toggleWithdrawWarning}
+                  >
+                    {renderAgreementCheckIcon(hasConfirmedWithdrawWarning)}
+                    <span className="terms-agreement-label">
+                      위 내용을 확인했어요.
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="terms-action-area">
+              <div className="terms-action-container withdraw-action-container">
+                <button
+                  type="button"
+                  className="withdraw-secondary-button"
+                  disabled={isWithdrawProcessing}
+                  onClick={closeWithdrawSheet}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  className="terms-start-button withdraw-danger-button"
+                  disabled={
+                    isWithdrawProcessing ||
+                    (withdrawStep === "warning" && !hasConfirmedWithdrawWarning)
+                  }
+                  aria-disabled={
+                    isWithdrawProcessing ||
+                    (withdrawStep === "warning" && !hasConfirmedWithdrawWarning)
+                  }
+                  onClick={
+                    withdrawStep === "warning"
+                      ? moveToWithdrawFinalStep
+                      : submitWithdraw
+                  }
+                >
+                  탈퇴하기
+                </button>
+              </div>
+              <div className="terms-safe-area" aria-hidden="true" />
             </div>
           </div>
         </section>

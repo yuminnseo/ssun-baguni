@@ -640,6 +640,23 @@ body {
   line-height: var(--label-small-line-height);
 }
 
+.home-page-footer-account-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.home-page-footer-withdraw {
+  color: rgba(17, 17, 17, 0.44);
+  cursor: pointer;
+  font-family: var(--label-small-font-family);
+  font-size: var(--label-small-font-size);
+  font-style: var(--label-small-font-style);
+  font-weight: var(--label-small-font-weight);
+  letter-spacing: var(--label-small-letter-spacing);
+  line-height: var(--label-small-line-height);
+}
+
 .legal-document-page {
   background: #ffffff;
   color: #27272a;
@@ -1093,6 +1110,14 @@ body {
   width: 100%;
 }
 
+.withdraw-sheet-content {
+  overflow: hidden;
+}
+
+.withdraw-sheet-content .terms-sheet-content-slot {
+  gap: 16px;
+}
+
 .terms-sheet-handlebar {
   align-items: center;
   display: flex;
@@ -1185,6 +1210,23 @@ body {
   line-height: var(--body-medium-line-height);
 }
 
+.withdraw-sheet-description {
+  color: rgba(17, 17, 17, 0.64);
+  font-family: "Pretendard", var(--font-base);
+  font-size: var(--body-medium-font-size);
+  font-style: normal;
+  font-weight: var(--body-medium-font-weight);
+  letter-spacing: var(--body-medium-letter-spacing);
+  line-height: var(--body-medium-line-height);
+  margin: 0;
+  white-space: pre-line;
+}
+
+.withdraw-confirm-row {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
 .terms-view-button {
   color: rgba(17, 17, 17, 0.44);
   cursor: pointer;
@@ -1216,6 +1258,12 @@ body {
 .terms-action-container {
   padding: 20px;
   width: 100%;
+}
+
+.withdraw-action-container {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
 }
 
 .terms-start-button {
@@ -1250,6 +1298,39 @@ body {
   cursor: not-allowed;
   opacity: 1;
   pointer-events: none;
+}
+
+.withdraw-secondary-button {
+  align-items: center;
+  background: #f4f4f5;
+  border-radius: 12px;
+  color: #27272a;
+  cursor: pointer;
+  display: inline-flex;
+  font-family: "Pretendard", var(--font-base);
+  font-size: var(--label-large-font-size);
+  font-style: normal;
+  font-weight: var(--label-large-font-weight);
+  height: 48px;
+  justify-content: center;
+  letter-spacing: var(--label-large-letter-spacing);
+  line-height: var(--label-large-line-height);
+  padding: 12px 24px;
+  transition:
+    background-color 150ms ease,
+    opacity 150ms ease;
+  width: 100%;
+}
+
+.withdraw-secondary-button:disabled {
+  color: #a1a1aa;
+  cursor: not-allowed;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.withdraw-danger-button:not(:disabled) {
+  background: #dc2626;
 }
 
 .terms-safe-area {

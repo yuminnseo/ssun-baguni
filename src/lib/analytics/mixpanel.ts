@@ -50,6 +50,11 @@ export const analyticsEvents = {
   TERMS_AGREED: "terms_agreed",
   TERMS_LINK_CLICKED: "terms_link_clicked",
   TERMS_SHEET_VIEWED: "terms_sheet_viewed",
+  WITHDRAW_COMPLETED: "withdraw_completed",
+  WITHDRAW_FAILED: "withdraw_failed",
+  WITHDRAW_FINAL_CLICKED: "withdraw_final_clicked",
+  WITHDRAW_STARTED: "withdraw_started",
+  WITHDRAW_WARNING_CONFIRMED: "withdraw_warning_confirmed",
 } as const;
 
 export type AnalyticsEventName =
@@ -119,6 +124,21 @@ export const resetAnalytics = () => {
     mixpanel.reset();
   } catch (error) {
     console.warn("Mixpanel reset failed.", error);
+  }
+};
+
+export const flushAnalytics = async () => {
+  initializeMixpanel();
+  if (!isInitialized) return;
+
+  const maybeFlush = (mixpanel as unknown as { flush?: () => void | Promise<void> })
+    .flush;
+  if (typeof maybeFlush !== "function") return;
+
+  try {
+    await maybeFlush.call(mixpanel);
+  } catch (error) {
+    console.warn("Mixpanel flush failed.", error);
   }
 };
 
