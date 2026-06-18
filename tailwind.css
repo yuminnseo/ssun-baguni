@@ -359,7 +359,7 @@ body {
   position: fixed;
   right: var(--app-shell-gutter);
   top: 80px;
-  transform: translate3d(0, calc(100dvh + 260px), 0) scale(0.98);
+  transform: translate3d(0, calc(100dvh + 260px), 0);
   visibility: hidden;
   width: auto;
   z-index: 1;
@@ -2333,11 +2333,11 @@ body {
 
 @keyframes cart-main-enter {
   from {
-    transform: translate3d(0, calc(100dvh + 260px), 0) scale(0.98);
+    transform: translate3d(0, calc(100dvh + 260px), 0);
   }
 
   to {
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: translate3d(0, 0, 0);
   }
 }
 
