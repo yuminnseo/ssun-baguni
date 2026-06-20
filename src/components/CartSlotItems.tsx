@@ -625,7 +625,14 @@ export const CartSlotItems = ({
             style={{ zIndex: isItemDragging || isTagDragging ? 8 : 4 }}
           >
             <svg className="tag-connector" viewBox={`0 0 ${CART_WIDTH} ${CART_HEIGHT}`} aria-hidden="true">
-              <path d={connectorPath} />
+              <path
+                d={connectorPath}
+                fill="none"
+                stroke="#111111"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1"
+              />
             </svg>
             <button
               type="button"

@@ -68,6 +68,11 @@ import {
   trackEvent,
 } from "../../lib/analytics/mixpanel";
 import {
+  createShareImage,
+  type ShareImagePayload,
+  type ShareImageResult,
+} from "../../lib/share/shareImage";
+import {
   getProfile,
   markProfileTermsAgreed,
 } from "../../lib/data/profiles";
@@ -504,6 +509,13 @@ export const HomeDefault = (): JSX.Element => {
     useState<CSSProperties | null>(null);
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [isClosingAddSheet, setIsClosingAddSheet] = useState(false);
+  const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
+  const [isClosingShareSheet, setIsClosingShareSheet] = useState(false);
+  const [isSharePreviewLoading, setIsSharePreviewLoading] = useState(false);
+  const [isShareProcessing, setIsShareProcessing] = useState(false);
+  const [sharePreviewResult, setSharePreviewResult] =
+    useState<ShareImageResult | null>(null);
+  const [sharePreviewError, setSharePreviewError] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isItemDatePickerOpen, setIsItemDatePickerOpen] = useState(false);
   const [isBackgroundFailureToastVisible, setIsBackgroundFailureToastVisible] =
@@ -579,6 +591,10 @@ export const HomeDefault = (): JSX.Element => {
   const photoPreparingToastTimerRef = useRef<number | null>(null);
   const photoPreparingDotsTimerRef = useRef<number | null>(null);
   const actionFailureToastTimerRef = useRef<number | null>(null);
+  const sharePreviewRunRef = useRef(0);
+  const shareSheetDragRef = useRef<{ startY: number } | null>(null);
+  const shareCartTargetRef = useRef<HTMLElement | null>(null);
+  const shareReceiptTargetRef = useRef<HTMLElement | null>(null);
   const preloadedCartImageSrcsRef = useRef<Set<string>>(new Set());
   const detailGradientRef = useRef<Record<string, string>>({});
   const detailSwipeRef = useRef<{ startX: number; startY: number } | null>(null);
@@ -648,6 +664,20 @@ export const HomeDefault = (): JSX.Element => {
     );
   const viewRailStyle =
     transitionPhase === "idle" ? railStyle : { ...railStyle, transition: "none" };
+  const setShareAwareItemRef =
+    (surface: "cart" | "receipt") =>
+    (index: number) =>
+    (node: HTMLElement | null) => {
+      setItemRef(index)(node);
+
+      if (index !== selectedIndex) return;
+
+      if (surface === "receipt") {
+        shareReceiptTargetRef.current = node;
+      } else {
+        shareCartTargetRef.current = node;
+      }
+    };
   const preparedCartIndexes = useMemo(() => {
     const indexes = new Set<number>();
     const startIndex = Math.max(selectedIndex - 2, 0);
@@ -778,6 +808,180 @@ export const HomeDefault = (): JSX.Element => {
       no_spend_day_count: noSpendDayCount,
       step,
     };
+  };
+  const getShareCartBackgroundColor = (cardBgClassName?: string) => {
+    const match = /bg-\[(#[0-9a-fA-F]{3,8})\]/.exec(cardBgClassName ?? "");
+
+    return match?.[1] ?? "#ffffff";
+  };
+  const getShareImagePayload = (): ShareImagePayload | null => {
+    const selectedCart = dateCarts[selectedIndex];
+    if (!selectedCart) return null;
+
+    const items = getDisplayCartItems(selectedCart.id, selectedCart.dateKey);
+    const summary = getDisplayCartSummary(selectedCart.id, selectedCart.dateKey);
+    const targetElement =
+      activeView === "receipt"
+        ? shareReceiptTargetRef.current
+        : shareCartTargetRef.current;
+
+    if (!targetElement) return null;
+
+    return {
+      cart: {
+        accentBgColor: selectedCart.accentBgColor,
+        cardBgColor: getShareCartBackgroundColor(selectedCart.cardBgClassName),
+        dateKey: selectedCart.dateKey,
+        id: selectedCart.id,
+        imageAlt: selectedCart.imageAlt,
+        imageSrc: selectedCart.imageSrc,
+        receiptColor: selectedCart.receiptColor,
+      },
+      hasNoSpendDay: effectiveNoSpendCartIds.has(selectedCart.id),
+      items,
+      targetElement,
+      totalAmount: summary.totalAmount,
+      view: activeView,
+    };
+  };
+  const getShareAnalyticsProperties = (
+    action?: "download" | "instagram" | "preview",
+    reason?: string,
+  ) => {
+    const selectedCart = dateCarts[selectedIndex];
+    const summary = selectedCart
+      ? getDisplayCartSummary(selectedCart.id, selectedCart.dateKey)
+      : { itemCount: 0 };
+
+    return {
+      action,
+      date: selectedCart?.dateKey.replaceAll(".", "-"),
+      has_items: summary.itemCount > 0,
+      has_no_spend_day: selectedCart
+        ? effectiveNoSpendCartIds.has(selectedCart.id)
+        : false,
+      item_count: summary.itemCount,
+      reason,
+      screen: "home",
+      source: "home_app_bar",
+      view: activeView,
+    };
+  };
+  const canShareSelectedDate = () => {
+    const selectedCart = dateCarts[selectedIndex];
+    if (!selectedCart) return false;
+
+    const summary = getDisplayCartSummary(selectedCart.id, selectedCart.dateKey);
+
+    return summary.itemCount > 0 || effectiveNoSpendCartIds.has(selectedCart.id);
+  };
+  const createCurrentShareImage = async () => {
+    const payload = getShareImagePayload();
+
+    if (!payload) {
+      throw new Error("No selected cart.");
+    }
+
+    return createShareImage(payload);
+  };
+  const getSharePreview = async () => {
+    if (sharePreviewResult) return sharePreviewResult;
+
+    return createCurrentShareImage();
+  };
+  const openShareSheet = () => {
+    if (!canShareSelectedDate()) {
+      showActionFailureToast("물건을 담고 사진을 공유해보세요!");
+      return;
+    }
+
+    if (!getShareImagePayload()) {
+      showActionFailureToast("이미지 준비에 실패했어요.");
+      return;
+    }
+
+    setIsClosingShareSheet(false);
+    setSharePreviewResult(null);
+    setSharePreviewError(false);
+    setIsShareSheetOpen(true);
+    trackEvent(analyticsEvents.SHARE_SHEET_OPENED, {
+      ...getShareAnalyticsProperties("preview"),
+    });
+  };
+  const closeShareSheet = () => {
+    if (isClosingShareSheet) return;
+
+    setIsClosingShareSheet(true);
+    window.setTimeout(() => {
+      setIsShareSheetOpen(false);
+      setIsClosingShareSheet(false);
+      setIsShareProcessing(false);
+    }, ADD_SHEET_ANIMATION_MS);
+  };
+  const downloadShareBlob = (result: ShareImageResult) => {
+    const objectUrl = window.URL.createObjectURL(result.blob);
+    const link = document.createElement("a");
+
+    try {
+      link.href = objectUrl;
+      link.download = result.fileName;
+      link.rel = "noopener";
+      link.target = "_blank";
+      link.style.display = "none";
+      document.body.appendChild(link);
+
+      if (!("download" in link)) {
+        const openedWindow = window.open(result.dataUrl, "_blank", "noopener");
+        if (!openedWindow) {
+          throw new Error("download_unsupported");
+        }
+        return "fallback" as const;
+      }
+
+      link.click();
+      return "download" as const;
+    } finally {
+      window.setTimeout(() => {
+        link.remove();
+        window.URL.revokeObjectURL(objectUrl);
+      }, 5000);
+    }
+  };
+  const trackShareFailed = (
+    action: "download" | "instagram" | "preview",
+    reason: string,
+  ) => {
+    trackEvent(analyticsEvents.SHARE_FAILED, {
+      ...getShareAnalyticsProperties(action, reason),
+    });
+  };
+  const handleShareDownload = async () => {
+    if (isShareProcessing) return;
+
+    setIsShareProcessing(true);
+    trackEvent(analyticsEvents.SHARE_DOWNLOAD_CLICKED, {
+      ...getShareAnalyticsProperties("download"),
+    });
+
+    try {
+      const result = await getSharePreview();
+      const downloadResult = downloadShareBlob(result);
+      setSharePreviewResult(result);
+      if (downloadResult === "fallback") {
+        showActionFailureToast("이미지를 길게 눌러 저장해주세요.");
+      } else {
+        trackEvent(analyticsEvents.SHARE_DOWNLOAD_COMPLETED, {
+          ...getShareAnalyticsProperties("download"),
+        });
+        showActionFailureToast("이미지 저장을 시작했어요.");
+      }
+    } catch (error) {
+      console.error("Failed to download share image.", error);
+      trackShareFailed("download", "download_failed");
+      showActionFailureToast("이미지 저장에 실패했어요.");
+    } finally {
+      setIsShareProcessing(false);
+    }
   };
   const getDidChangeTime = () => itemTime !== itemFlowInitialTimeRef.current;
   const getItemFlowElapsedMs = () =>
@@ -1946,6 +2150,46 @@ export const HomeDefault = (): JSX.Element => {
     }
   }, []);
 
+  useEffect(() => {
+    if (!isShareSheetOpen) return;
+
+    const runId = sharePreviewRunRef.current + 1;
+    sharePreviewRunRef.current = runId;
+    setIsSharePreviewLoading(true);
+    setSharePreviewError(false);
+
+    void createCurrentShareImage()
+      .then((result) => {
+        if (sharePreviewRunRef.current !== runId) return;
+
+        setSharePreviewResult(result);
+      })
+      .catch((error) => {
+        if (sharePreviewRunRef.current !== runId) return;
+
+        console.error("Failed to create share preview.", error);
+        setSharePreviewResult(null);
+        setSharePreviewError(true);
+        trackShareFailed("preview", "preview_failed");
+        showActionFailureToast("이미지 준비에 실패했어요.");
+      })
+      .finally(() => {
+        if (sharePreviewRunRef.current !== runId) return;
+
+        setIsSharePreviewLoading(false);
+      });
+  }, [
+    activeView,
+    cartDataVersion,
+    dateCarts,
+    dbCartData.loadedDateKeys,
+    dbCartData.noSpendDateKeys,
+    dbCartData.slotItemsByDate,
+    effectiveNoSpendCartIds,
+    isShareSheetOpen,
+    selectedIndex,
+  ]);
+
   const selectDate = (dateKey: string) => {
     if (isLoggedOutStart) {
       showLoginToast();
@@ -2949,6 +3193,19 @@ export const HomeDefault = (): JSX.Element => {
                 </span>
               </button>
             )}
+            <button
+              type="button"
+              aria-label="공유하기"
+              className="home-share-icon-button"
+              onClick={openShareSheet}
+            >
+              <img
+                alt=""
+                aria-hidden="true"
+                className="home-share-icon"
+                src="/icons/icon-share.svg"
+              />
+            </button>
             <Link
               aria-label="장바구니 색상 변경"
               className="inline-flex items-center gap-5 relative self-stretch flex-[0_0_auto]"
@@ -3093,7 +3350,7 @@ export const HomeDefault = (): JSX.Element => {
                         ref={
                           transitionPhase === "cart-to-receipt"
                             ? undefined
-                            : setItemRef(index)
+                            : setShareAwareItemRef("cart")(index)
                         }
                         className={cart.wrapperClassName}
                       >
@@ -3205,7 +3462,7 @@ export const HomeDefault = (): JSX.Element => {
               setItemRef={
                 transitionPhase === "receipt-to-cart"
                   ? (_index: number) => (_node: HTMLElement | null) => {}
-                  : setItemRef
+                  : setShareAwareItemRef("receipt")
               }
             />
           )}
@@ -3523,6 +3780,102 @@ export const HomeDefault = (): JSX.Element => {
           onSelectDate={selectDate}
           onClose={() => setIsDatePickerOpen(false)}
         />
+      )}
+      {isShareSheetOpen && (
+        <section
+          className="terms-sheet-overlay"
+          aria-label="이미지 저장 및 공유"
+          role="dialog"
+          aria-modal="true"
+          onClick={closeShareSheet}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            closeShareSheet();
+          }}
+        >
+          <div
+            className={`terms-sheet-backdrop ${
+              isClosingShareSheet ? "sheet-backdrop-out" : "sheet-backdrop-in"
+            }`}
+            aria-hidden="true"
+          />
+          <div
+            className={`terms-sheet-content share-sheet-content ${
+              isClosingShareSheet ? "bottom-sheet-out" : "bottom-sheet-in"
+            }`}
+            onClick={(event) => event.stopPropagation()}
+            onPointerDown={(event) => {
+              shareSheetDragRef.current = { startY: event.clientY };
+            }}
+            onPointerUp={(event) => {
+              const dragState = shareSheetDragRef.current;
+              shareSheetDragRef.current = null;
+
+              if (!dragState) return;
+              if (event.clientY - dragState.startY > 64) {
+                closeShareSheet();
+              }
+            }}
+            onPointerCancel={() => {
+              shareSheetDragRef.current = null;
+            }}
+          >
+            <div className="terms-sheet-handlebar">
+              <div className="terms-sheet-handlebar-mark" />
+            </div>
+            <div className="share-sheet-container">
+              <div className="share-sheet-content-slot">
+                <div className="share-preview-wrapper">
+                  <div className="share-preview-frame">
+                    {sharePreviewResult ? (
+                      <img
+                        alt="공유 이미지 미리보기"
+                        className="share-preview-image"
+                        src={sharePreviewResult.dataUrl}
+                      />
+                    ) : (
+                      <div className="share-preview-placeholder">
+                        <span>
+                          {sharePreviewError
+                            ? "이미지를 준비하지 못했어요"
+                            : isSharePreviewLoading
+                              ? "이미지 준비 중"
+                              : "이미지 준비 중"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="share-sheet-divider" />
+                <div className="share-action-list">
+                  <button
+                    type="button"
+                    aria-label="이미지 저장"
+                    className="share-action-button"
+                    disabled={isShareProcessing || isSharePreviewLoading}
+                    onClick={handleShareDownload}
+                  >
+                    <span className="share-action-icon-button">
+                      <span className="share-action-icon-background">
+                        <img
+                          alt=""
+                          aria-hidden="true"
+                          className="share-action-icon"
+                          src="/icons/icon-download.svg"
+                        />
+                      </span>
+                    </span>
+                    <span className="share-action-label">이미지 저장</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="terms-safe-area" aria-hidden="true" />
+          </div>
+        </section>
       )}
       {isAddSheetOpen && (
         <section
