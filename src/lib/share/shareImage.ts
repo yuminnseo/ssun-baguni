@@ -36,17 +36,98 @@ const BRAND_BOTTOM = 36 * EXPORT_SCALE;
 const BRAND_FONT_SIZE = 14 * EXPORT_SCALE;
 const BRAND_LINE_HEIGHT = 16 * EXPORT_SCALE;
 const RECEIPT_MIN_TOP = 100 * EXPORT_SCALE;
+const FONT_READY_TIMEOUT_MS = 3000;
+const IMAGE_READY_TIMEOUT_MS = 8000;
 
 const toFileDate = (dateKey: string) => dateKey.replaceAll(".", "-");
 
 export const getShareImageFileName = (view: ShareImageView, dateKey: string) =>
   `ssun-baguni-${view}-${toFileDate(dateKey)}.png`;
 
+const withTimeout = <T,>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string,
+) =>
+  new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => window.clearTimeout(timeoutId));
+  });
+
 const waitForFonts = async () => {
   if (!("fonts" in document)) return;
 
-  await document.fonts.load(`500 ${BRAND_FONT_SIZE}px Satoshi`, "@ssun_baguni");
-  await document.fonts.ready;
+  try {
+    await withTimeout(
+      Promise.all([
+        document.fonts.load(`500 ${BRAND_FONT_SIZE}px Satoshi`, "@ssun_baguni"),
+        document.fonts.load(`400 17px Pretendard`, "₩"),
+        document.fonts.ready,
+      ]),
+      FONT_READY_TIMEOUT_MS,
+      "Timed out waiting for share image fonts.",
+    );
+  } catch (error) {
+    console.warn("Share image font readiness timed out.", error);
+  }
+};
+
+const preloadImageSource = async (src: string) => {
+  await withTimeout(
+    new Promise<void>((resolve, reject) => {
+      const image = new Image();
+      const url = new URL(src, window.location.href);
+
+      if (url.origin !== window.location.origin) {
+        image.crossOrigin = "anonymous";
+      }
+      image.decoding = "async";
+      image.onload = () => {
+        if (image.naturalWidth <= 0) {
+          reject(new Error(`Share target image has no natural size: ${src}`));
+          return;
+        }
+
+        image.decode().then(resolve).catch(resolve);
+      };
+      image.onerror = () =>
+        reject(new Error(`Failed to load share target image: ${src}`));
+      image.src = src;
+    }),
+    IMAGE_READY_TIMEOUT_MS,
+    `Timed out waiting for share target image: ${src}`,
+  );
+};
+
+const waitForImageElement = async (image: HTMLImageElement) => {
+  const src = image.currentSrc || image.src;
+
+  if (!src) return;
+
+  image.loading = "eager";
+
+  if (image.complete && image.naturalWidth > 0) {
+    await image.decode().catch(() => undefined);
+    return;
+  }
+
+  await preloadImageSource(src);
+
+  if (image.complete && image.naturalWidth > 0) return;
+
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+};
+
+const waitForTargetImages = async (targetElement: HTMLElement) => {
+  const images = Array.from(targetElement.querySelectorAll("img"));
+
+  await Promise.all(images.map(waitForImageElement));
 };
 
 const loadImage = (src: string) =>
@@ -144,9 +225,17 @@ const captureTarget = async (targetElement: HTMLElement) => {
     throw new Error("Share target is not visible.");
   }
 
+  await waitForTargetImages(targetElement);
+
   return toPng(targetElement, {
     backgroundColor: "transparent",
     cacheBust: true,
+    fetchRequestInit: {
+      cache: "no-cache",
+      credentials: "omit",
+      mode: "cors",
+    },
+    includeQueryParams: true,
     pixelRatio: 3,
     skipFonts: false,
   });
@@ -184,10 +273,15 @@ export const createShareImage = async ({
   drawBrand(context);
 
   const blob = await blobFromCanvas(canvas);
+  const dataUrl = canvas.toDataURL("image/png");
+
+  if (blob.size <= 0 || !dataUrl.startsWith("data:image/png")) {
+    throw new Error("Failed to create share image data.");
+  }
 
   return {
     blob,
-    dataUrl: canvas.toDataURL("image/png"),
+    dataUrl,
     fileName: getShareImageFileName(view, cart.dateKey),
   };
 };

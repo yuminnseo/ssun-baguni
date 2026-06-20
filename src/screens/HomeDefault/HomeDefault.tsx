@@ -2171,7 +2171,7 @@ export const HomeDefault = (): JSX.Element => {
         setSharePreviewResult(null);
         setSharePreviewError(true);
         trackShareFailed("preview", "preview_failed");
-        showActionFailureToast("이미지 준비에 실패했어요.");
+        showActionFailureToast("이미지 미리보기를 불러오지 못했어요.");
       })
       .finally(() => {
         if (sharePreviewRunRef.current !== runId) return;
@@ -2837,7 +2837,7 @@ export const HomeDefault = (): JSX.Element => {
                   얼마에 구매하셨나요?
                 </label>
                 <div className="item-flow-price-field">
-                  <span className="item-flow-price-currency">₩</span>
+                  <span className="item-flow-price-currency won-symbol">₩</span>
                   <input
                     id="item-price"
                     aria-label="구매 금액"
@@ -3380,7 +3380,7 @@ export const HomeDefault = (): JSX.Element => {
                                 className="inline-flex items-center gap-1 relative flex-[0_0_auto]"
                                 data-typography-semantic-mode="english"
                               >
-                                <div className="relative w-fit mt-[-1.00px] font-headline font-[number:var(--headline-font-weight)] text-zinc-800 text-[length:var(--headline-font-size)] tracking-[var(--headline-letter-spacing)] leading-[var(--headline-line-height)] whitespace-nowrap [font-style:var(--headline-font-style)]">
+                                <div className="won-symbol relative w-fit mt-[-1.00px] font-headline font-[number:var(--headline-font-weight)] text-zinc-800 text-[length:var(--headline-font-size)] tracking-[var(--headline-letter-spacing)] leading-[var(--headline-line-height)] whitespace-nowrap [font-style:var(--headline-font-style)]">
                                   ₩
                                 </div>
                                 <div className="relative w-fit mt-[-1.00px] font-headline font-[number:var(--headline-font-weight)] text-zinc-800 text-[length:var(--headline-font-size)] tracking-[var(--headline-letter-spacing)] leading-[var(--headline-line-height)] whitespace-nowrap [font-style:var(--headline-font-style)]">
@@ -3394,6 +3394,7 @@ export const HomeDefault = (): JSX.Element => {
                           <img
                             className="relative h-full w-full object-cover"
                             alt={cart.imageAlt}
+                            crossOrigin="anonymous"
                             decoding="async"
                             loading={shouldPrepareCartImage ? "eager" : "lazy"}
                             src={cart.imageSrc}
@@ -3840,7 +3841,7 @@ export const HomeDefault = (): JSX.Element => {
                       <div className="share-preview-placeholder">
                         <span>
                           {sharePreviewError
-                            ? "이미지를 준비하지 못했어요"
+                            ? "미리보기를 불러오지 못했어요"
                             : isSharePreviewLoading
                               ? "이미지 준비 중"
                               : "이미지 준비 중"}
@@ -3855,7 +3856,9 @@ export const HomeDefault = (): JSX.Element => {
                     type="button"
                     aria-label="이미지 저장"
                     className="share-action-button"
-                    disabled={isShareProcessing || isSharePreviewLoading}
+                    disabled={
+                      isShareProcessing || isSharePreviewLoading || !sharePreviewResult
+                    }
                     onClick={handleShareDownload}
                   >
                     <span className="share-action-icon-button">

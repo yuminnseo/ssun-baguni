@@ -440,7 +440,7 @@ export const ReceiptRail = ({
                         className="inline-flex items-center gap-1 relative flex-[0_0_auto]"
                         data-typography-semantic-mode="english"
                       >
-                        <span className="relative w-fit mt-[-1.00px] font-title-large font-[number:var(--title-large-font-weight)] text-zinc-800 text-[length:var(--title-large-font-size)] tracking-[var(--title-large-letter-spacing)] leading-[var(--title-large-line-height)] whitespace-nowrap [font-style:var(--title-large-font-style)]">
+                        <span className="won-symbol relative w-fit mt-[-1.00px] font-title-large font-[number:var(--title-large-font-weight)] text-zinc-800 text-[length:var(--title-large-font-size)] tracking-[var(--title-large-letter-spacing)] leading-[var(--title-large-line-height)] whitespace-nowrap [font-style:var(--title-large-font-style)]">
                           ₩
                         </span>
                         <strong className="relative w-fit mt-[-1.00px] font-title-large font-[number:var(--title-large-font-weight)] text-zinc-800 text-[length:var(--title-large-font-size)] tracking-[var(--title-large-letter-spacing)] leading-[var(--title-large-line-height)] whitespace-nowrap [font-style:var(--title-large-font-style)]">
@@ -537,6 +537,8 @@ export const ReceiptRail = ({
                                 aria-hidden="true"
                                 className="relative w-[52px] h-[52px] object-contain"
                                 alt=""
+                                crossOrigin="anonymous"
+                                decoding="async"
                                 loading="lazy"
                                 src={item.imageSrc}
                               />

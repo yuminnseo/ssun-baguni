@@ -291,7 +291,7 @@ const CartCard = ({
                 className="inline-flex items-center gap-1 relative flex-[0_0_auto]"
                 data-typography-semantic-mode="english"
               >
-                <div className="relative w-fit mt-[-1.00px] font-headline font-[number:var(--headline-font-weight)] text-zinc-800 text-[length:var(--headline-font-size)] tracking-[var(--headline-letter-spacing)] leading-[var(--headline-line-height)] whitespace-nowrap [font-style:var(--headline-font-style)]">
+                <div className="won-symbol relative w-fit mt-[-1.00px] font-headline font-[number:var(--headline-font-weight)] text-zinc-800 text-[length:var(--headline-font-size)] tracking-[var(--headline-letter-spacing)] leading-[var(--headline-line-height)] whitespace-nowrap [font-style:var(--headline-font-style)]">
                   ₩
                 </div>
                 <div className="w-fit font-headline font-[number:var(--headline-font-weight)] text-zinc-800 text-[length:var(--headline-font-size)] leading-[var(--headline-line-height)] relative mt-[-1.00px] tracking-[var(--headline-letter-spacing)] whitespace-nowrap [font-style:var(--headline-font-style)]">

@@ -266,6 +266,8 @@ const NoSpendSticker = ({ className = "" }: { className?: string }) => (
     <img
       alt="무지출 데이"
       className="no-spend-sticker-image"
+      crossOrigin="anonymous"
+      decoding="async"
       draggable={false}
       src={NO_SPEND_STICKER_SRC}
     />
@@ -345,7 +347,7 @@ const PriceTag = ({ amount }: { amount: number }) => (
     </svg>
     <div className="price-tag-content">
       <div className="price-tag-price">
-        <span>₩</span>
+        <span className="won-symbol">₩</span>
         <span>{formatWonAmount(amount)}</span>
       </div>
     </div>
@@ -685,6 +687,8 @@ export const CartSlotItems = ({
               <img
                 className="h-full w-full object-contain"
                 alt="구매 물품"
+                crossOrigin="anonymous"
+                decoding="async"
                 src={item.imageSrc}
                 draggable={false}
               />

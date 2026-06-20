@@ -18,6 +18,14 @@
   font-weight: 300 900;
 }
 
+@font-face {
+  font-family: "Pretendard";
+  src: url("/fonts/pretendard-fonts/PretendardVariable.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 100 900;
+}
+
 @layer base {
   button,
   input,
@@ -1232,8 +1240,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 64px;
   padding-top: 8px;
-  width: 55px;
+  width: max-content;
 }
 
 .share-action-button:disabled {
@@ -1288,7 +1297,6 @@ body {
 }
 
 .share-action-label {
-  align-self: stretch;
   color: #27272a;
   font-family: "Pretendard", var(--font-base);
   font-size: var(--caption-small-font-size);
@@ -1297,6 +1305,7 @@ body {
   letter-spacing: var(--caption-small-letter-spacing);
   line-height: var(--caption-small-line-height);
   text-align: center;
+  white-space: nowrap;
   word-break: keep-all;
 }
 
@@ -1695,10 +1704,15 @@ body {
 
 .item-flow-price-currency {
   color: #27272a;
-  font-family: var(--body-large-font-family);
+  font-family: "Pretendard", var(--font-base);
   font-size: var(--body-large-font-size);
   font-weight: var(--body-large-font-weight);
   line-height: var(--body-large-line-height);
+}
+
+.won-symbol {
+  font-family: "Pretendard", var(--font-base);
+  font-synthesis: none;
 }
 
 .item-flow-price-field input {
@@ -1893,10 +1907,11 @@ body {
 .item-flow-price-action-area {
   bottom: var(--item-flow-keyboard-offset, 0px);
   box-sizing: border-box;
-  left: var(--app-shell-gutter);
+  left: 50%;
   position: fixed;
-  right: var(--app-shell-gutter);
-  width: auto;
+  transform: translateX(-50%);
+  max-width: var(--app-max-width);
+  width: var(--app-shell-width);
   z-index: 35;
 }
 
