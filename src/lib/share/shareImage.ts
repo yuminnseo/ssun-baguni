@@ -1,5 +1,8 @@
+import html2canvas from "html2canvas";
 import { toPng } from "html-to-image";
 import type { SlotItem } from "../../components/CartSlotItems";
+import { createShareCanvasFallback } from "./shareImageCanvasFallback";
+import { createReceiptCanvasFallback } from "./shareReceiptCanvasFallback";
 
 export type ShareImageView = "cart" | "receipt";
 
@@ -38,6 +41,8 @@ const BRAND_LINE_HEIGHT = 16 * EXPORT_SCALE;
 const RECEIPT_MIN_TOP = 100 * EXPORT_SCALE;
 const FONT_READY_TIMEOUT_MS = 3000;
 const IMAGE_READY_TIMEOUT_MS = 8000;
+const SAFARI_CAPTURE_MAX_ATTEMPTS = 2;
+const SAFARI_CAPTURE_SETTLE_MS = 100;
 
 const toFileDate = (dateKey: string) => dateKey.replaceAll(".", "-");
 
@@ -76,6 +81,81 @@ const waitForFonts = async () => {
   } catch (error) {
     console.warn("Share image font readiness timed out.", error);
   }
+};
+
+const isWebKitCaptureBrowser = () => {
+  if (typeof navigator === "undefined") return false;
+
+  const userAgent = navigator.userAgent;
+  const isIOS = /iP(ad|hone|od)/.test(userAgent);
+  const isSafari = /Safari/.test(userAgent) && !/Chrome|Chromium|Edg|OPR/.test(userAgent);
+
+  return isIOS || isSafari;
+};
+
+type RestoreCaptureMutation = () => void;
+
+const runRestoreCallbacks = (restoreCallbacks: RestoreCaptureMutation[]) => {
+  [...restoreCallbacks].reverse().forEach((restore) => restore());
+};
+
+const getUrlsFromCssImage = (value: string) =>
+  Array.from(value.matchAll(/url\((['"]?)(.*?)\1\)/g))
+    .map((match) => match[2])
+    .filter((url) => url && !url.startsWith("data:"));
+
+const removeSafariCaptureEffects = (targetElement: HTMLElement) => {
+  const restoreCallbacks: RestoreCaptureMutation[] = [];
+  const elements = [
+    targetElement,
+    ...Array.from(targetElement.querySelectorAll<HTMLElement>("*")),
+  ];
+
+  elements.forEach((element) => {
+    const computedStyle = window.getComputedStyle(element);
+    const hasBackdropFilter = computedStyle.backdropFilter !== "none";
+    const hasBoxShadow = computedStyle.boxShadow !== "none";
+    const hasFilter = computedStyle.filter !== "none";
+    const hasWebkitBackdropFilter = computedStyle.webkitBackdropFilter !== "none";
+
+    if (!hasBackdropFilter && !hasBoxShadow && !hasFilter && !hasWebkitBackdropFilter) {
+      return;
+    }
+
+    const originalBackdropFilter = element.style.backdropFilter;
+    const originalBoxShadow = element.style.boxShadow;
+    const originalFilter = element.style.filter;
+    const originalWebkitBackdropFilter = element.style.webkitBackdropFilter;
+
+    restoreCallbacks.push(() => {
+      element.style.backdropFilter = originalBackdropFilter;
+      element.style.boxShadow = originalBoxShadow;
+      element.style.filter = originalFilter;
+      element.style.webkitBackdropFilter = originalWebkitBackdropFilter;
+    });
+
+    if (hasBackdropFilter) element.style.backdropFilter = "none";
+    if (hasBoxShadow) element.style.boxShadow = "none";
+    if (hasFilter) element.style.filter = "none";
+    if (hasWebkitBackdropFilter) element.style.webkitBackdropFilter = "none";
+  });
+
+  return () => runRestoreCallbacks(restoreCallbacks);
+};
+
+const delay = (milliseconds: number) =>
+  new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+
+const waitForAnimationFrames = async (count: number) => {
+  for (let index = 0; index < count; index += 1) {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  }
+};
+
+const waitForSafariCaptureSettle = async (targetElement: HTMLElement) => {
+  await waitForTargetImages(targetElement);
+  await waitForAnimationFrames(3);
+  await delay(SAFARI_CAPTURE_SETTLE_MS);
 };
 
 const preloadImageSource = async (src: string) => {
@@ -137,6 +217,77 @@ const loadImage = (src: string) =>
     image.onerror = () => reject(new Error("Failed to load captured image."));
     image.src = src;
   });
+
+const assertCaptureIsNotBlank = async (dataUrl: string) => {
+  const image = await loadImage(dataUrl);
+  const canvas = document.createElement("canvas");
+  const width = Math.max(1, Math.min(image.width, 96));
+  const height = Math.max(1, Math.min(image.height, 96));
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+
+  if (!context) return { nonWhitePixelRatio: 1, visiblePixelRatio: 1 };
+
+  canvas.width = width;
+  canvas.height = height;
+  context.drawImage(image, 0, 0, width, height);
+
+  const pixels = context.getImageData(0, 0, width, height).data;
+  let visiblePixelCount = 0;
+  let nonWhitePixelCount = 0;
+
+  for (let index = 0; index < pixels.length; index += 4) {
+    const red = pixels[index];
+    const green = pixels[index + 1];
+    const blue = pixels[index + 2];
+    const alpha = pixels[index + 3];
+
+    if (alpha > 8) {
+      visiblePixelCount += 1;
+    }
+
+    if (alpha > 8 && (red < 245 || green < 245 || blue < 245)) {
+      nonWhitePixelCount += 1;
+    }
+  }
+
+  const totalPixels = width * height;
+  const nonWhitePixelRatio = nonWhitePixelCount / totalPixels;
+  const visiblePixelRatio = visiblePixelCount / totalPixels;
+
+  if (visiblePixelRatio < 0.01 || nonWhitePixelRatio < 0.01) {
+    throw new Error(
+      `Safari capture produced blank image. visible=${visiblePixelRatio.toFixed(
+        4,
+      )}, nonWhite=${nonWhitePixelRatio.toFixed(4)}`,
+    );
+  }
+
+  return { nonWhitePixelRatio, visiblePixelRatio };
+};
+
+const captureTargetWithHtml2Canvas = async (
+  targetElement: HTMLElement,
+  rect: DOMRect,
+) => {
+  const canvas = await html2canvas(targetElement, {
+    allowTaint: false,
+    backgroundColor: null,
+    foreignObjectRendering: false,
+    height: Math.ceil(rect.height),
+    imageTimeout: 10000,
+    logging: false,
+    removeContainer: true,
+    scale: Math.min(window.devicePixelRatio || 1, 2),
+    scrollX: -window.scrollX,
+    scrollY: -window.scrollY,
+    useCORS: true,
+    width: Math.ceil(rect.width),
+    x: rect.left + window.scrollX,
+    y: rect.top + window.scrollY,
+  });
+
+  return canvas.toDataURL("image/png");
+};
 
 const blobFromCanvas = (canvas: HTMLCanvasElement) =>
   new Promise<Blob>((resolve, reject) => {
@@ -225,29 +376,97 @@ const captureTarget = async (targetElement: HTMLElement) => {
     throw new Error("Share target is not visible.");
   }
 
-  await waitForTargetImages(targetElement);
+  if (!isWebKitCaptureBrowser()) {
+    await waitForTargetImages(targetElement);
 
-  return toPng(targetElement, {
-    backgroundColor: "transparent",
-    cacheBust: true,
-    fetchRequestInit: {
-      cache: "no-cache",
-      credentials: "omit",
-      mode: "cors",
-    },
-    includeQueryParams: true,
-    pixelRatio: 3,
-    skipFonts: false,
-  });
+    return toPng(targetElement, {
+      backgroundColor: "transparent",
+      cacheBust: true,
+      fetchRequestInit: {
+        cache: "no-cache",
+        credentials: "omit",
+        mode: "cors",
+      },
+      includeQueryParams: true,
+      pixelRatio: 3,
+      skipFonts: false,
+    });
+  }
+
+  const restoreCaptureEffects = removeSafariCaptureEffects(targetElement);
+  let lastCaptureError: unknown = null;
+
+  try {
+    for (let attempt = 1; attempt <= SAFARI_CAPTURE_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        await waitForSafariCaptureSettle(targetElement);
+
+        const dataUrl = await captureTargetWithHtml2Canvas(targetElement, rect);
+        const metrics = await assertCaptureIsNotBlank(dataUrl);
+
+        if (attempt > 1) {
+          console.warn("Safari share capture succeeded after retry.", {
+            attempt,
+            browserPath: "safari-html2canvas",
+            ...metrics,
+          });
+        }
+
+        return dataUrl;
+      } catch (error) {
+        lastCaptureError = error;
+        console.warn("Safari share capture attempt failed.", {
+          attempt,
+          browserPath: "safari-html2canvas",
+          error,
+          backgroundImageCount: Array.from(
+            targetElement.querySelectorAll<HTMLElement>("*"),
+          ).filter((element) =>
+            getUrlsFromCssImage(window.getComputedStyle(element).backgroundImage)
+              .length > 0,
+          ).length,
+          imgCount: targetElement.querySelectorAll("img").length,
+          targetHeight: rect.height,
+          targetWidth: rect.width,
+        });
+      }
+    }
+
+    console.error("Safari share capture failed after retries.", {
+      attempts: SAFARI_CAPTURE_MAX_ATTEMPTS,
+      browserPath: "safari-html2canvas",
+      error: lastCaptureError,
+      backgroundImageCount: Array.from(
+        targetElement.querySelectorAll<HTMLElement>("*"),
+      ).filter((element) =>
+        getUrlsFromCssImage(window.getComputedStyle(element).backgroundImage).length >
+        0,
+      ).length,
+      imgCount: targetElement.querySelectorAll("img").length,
+      targetHeight: rect.height,
+      targetWidth: rect.width,
+    });
+    throw lastCaptureError ?? new Error("Safari share capture failed.");
+  } finally {
+    restoreCaptureEffects();
+  }
 };
 
-export const createShareImage = async ({
-  cart,
-  targetElement,
-  view,
-}: ShareImagePayload): Promise<ShareImageResult> => {
+export const createShareImage = async (
+  payload: ShareImagePayload,
+): Promise<ShareImageResult> => {
   if (typeof document === "undefined") {
     throw new Error("Document is not available.");
+  }
+
+  const { cart, targetElement, view } = payload;
+
+  if (isWebKitCaptureBrowser() && view === "cart") {
+    return createShareCanvasFallback(payload);
+  }
+
+  if (isWebKitCaptureBrowser() && view === "receipt") {
+    return createReceiptCanvasFallback(payload);
   }
 
   await waitForFonts();
