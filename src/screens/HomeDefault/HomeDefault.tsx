@@ -624,9 +624,6 @@ export const HomeDefault = (): JSX.Element => {
     useState(false);
   const [isItemFlowSaving, setIsItemFlowSaving] = useState(false);
   const [isLoginToastVisible, setIsLoginToastVisible] = useState(false);
-  const [isPhotoPreparingToastVisible, setIsPhotoPreparingToastVisible] =
-    useState(false);
-  const [photoPreparingDotCount, setPhotoPreparingDotCount] = useState(1);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [actionFailureToastMessage, setActionFailureToastMessage] =
     useState("");
@@ -704,8 +701,6 @@ export const HomeDefault = (): JSX.Element => {
   const processingBannerExitTimerRef = useRef<number | null>(null);
   const processingFailureSheetTimerRef = useRef<number | null>(null);
   const loginToastTimerRef = useRef<number | null>(null);
-  const photoPreparingToastTimerRef = useRef<number | null>(null);
-  const photoPreparingDotsTimerRef = useRef<number | null>(null);
   const actionFailureToastTimerRef = useRef<number | null>(null);
   const sharePreviewRunRef = useRef(0);
   const shareSheetDragRef = useRef<{ startY: number } | null>(null);
@@ -1188,35 +1183,6 @@ export const HomeDefault = (): JSX.Element => {
       }, LOGIN_TOAST_MS);
     });
   };
-  const showPhotoPreparingToast = () => {
-    if (photoPreparingToastTimerRef.current !== null) {
-      window.clearTimeout(photoPreparingToastTimerRef.current);
-      photoPreparingToastTimerRef.current = null;
-    }
-    if (photoPreparingDotsTimerRef.current === null) {
-      photoPreparingDotsTimerRef.current = window.setInterval(() => {
-        setPhotoPreparingDotCount((currentCount) =>
-          currentCount >= 3 ? 1 : currentCount + 1,
-        );
-      }, 420);
-    }
-
-    setPhotoPreparingDotCount(1);
-    setIsPhotoPreparingToastVisible(true);
-  };
-  const hidePhotoPreparingToast = () => {
-    if (photoPreparingToastTimerRef.current !== null) {
-      window.clearTimeout(photoPreparingToastTimerRef.current);
-      photoPreparingToastTimerRef.current = null;
-    }
-    if (photoPreparingDotsTimerRef.current !== null) {
-      window.clearInterval(photoPreparingDotsTimerRef.current);
-      photoPreparingDotsTimerRef.current = null;
-    }
-
-    setIsPhotoPreparingToastVisible(false);
-    setPhotoPreparingDotCount(1);
-  };
   const showActionFailureToast = (message: string) => {
     if (actionFailureToastTimerRef.current !== null) {
       window.clearTimeout(actionFailureToastTimerRef.current);
@@ -1354,7 +1320,6 @@ export const HomeDefault = (): JSX.Element => {
     setIsItemTimePickerOpen(false);
     setEditingItem(null);
     setIsItemFlowSaving(false);
-    hidePhotoPreparingToast();
     setActionFailureToastMessage("");
     setSelectedItemImageFile(null);
     resetItemImagePreparation();
@@ -1473,7 +1438,6 @@ export const HomeDefault = (): JSX.Element => {
     setIsItemTimePickerOpen(false);
     setEditingItem(null);
     setIsItemFlowSaving(false);
-    hidePhotoPreparingToast();
     setActionFailureToastMessage("");
     setSelectedItemImageFile(null);
     resetItemImagePreparation();
@@ -2536,12 +2500,6 @@ export const HomeDefault = (): JSX.Element => {
     if (loginToastTimerRef.current !== null) {
       window.clearTimeout(loginToastTimerRef.current);
     }
-    if (photoPreparingToastTimerRef.current !== null) {
-      window.clearTimeout(photoPreparingToastTimerRef.current);
-    }
-    if (photoPreparingDotsTimerRef.current !== null) {
-      window.clearInterval(photoPreparingDotsTimerRef.current);
-    }
     if (actionFailureToastTimerRef.current !== null) {
       window.clearTimeout(actionFailureToastTimerRef.current);
     }
@@ -3552,28 +3510,6 @@ export const HomeDefault = (): JSX.Element => {
               </div>
             </div>
           </section>
-        )}
-        {isPhotoPreparingToastVisible && (
-          <div
-            className="login-required-toast photo-preparing-toast"
-            role="status"
-            aria-live="polite"
-          >
-            <img
-              alt=""
-              aria-hidden="true"
-              className="login-required-toast-icon"
-              src="/icons/icon-sparkle.svg"
-            />
-            <span className="photo-preparing-toast-copy">
-              <span className="photo-preparing-toast-text">
-                사진을 준비 중이에요
-              </span>
-              <span className="photo-preparing-toast-dots">
-                {".".repeat(photoPreparingDotCount)}
-              </span>
-            </span>
-          </div>
         )}
       </main>
     );
