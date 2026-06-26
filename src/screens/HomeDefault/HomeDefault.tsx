@@ -179,6 +179,108 @@ const removeTermsAgreement = (userId: string) => {
 type RequiredAgreementKey = "age" | "privacy" | "terms";
 type ItemFlowStep = "price" | "details" | null;
 type WithdrawStep = "warning" | "final";
+type ProcessingBannerStatus =
+  | "idle"
+  | "uploading"
+  | "processing"
+  | "completing"
+  | "completed"
+  | "failed";
+
+type ProcessingBannerState = {
+  imageUrl: string;
+  progress: number;
+  status: ProcessingBannerStatus;
+};
+
+type PendingItemCreateSnapshot = {
+  backgroundRemovalAlreadyFailed: boolean;
+  backgroundRemovalPromise: Promise<string | null> | null;
+  category: string;
+  didChangeTime: boolean;
+  elapsedMs: number | null;
+  existingItemsCount: number;
+  fallbackImageSrc: string;
+  hadNoSpendDay: boolean;
+  hasSelectedImageFile: boolean;
+  imageFile: File | null;
+  itemTime: string;
+  originalImageUploadPromise: Promise<string> | null;
+  pendingRemovedBgImageUrl: string;
+  price: number;
+  priceInput: string;
+  reason: string;
+  targetCart: {
+    dateKey: string;
+    id: string;
+    imageAlt: string;
+  };
+  targetDate: string;
+  uploadedOriginalImageUrl: string;
+  userId: string;
+};
+
+type HomeProcessingBannerProps = {
+  imageSrc: string;
+  progress: number;
+  status: ProcessingBannerStatus;
+};
+
+const HomeProcessingBanner = ({
+  imageSrc,
+  progress,
+  status,
+}: HomeProcessingBannerProps) => {
+  const safeProgress = Math.min(Math.max(progress, 0), 100);
+  const title =
+    status === "failed"
+      ? "배경 제거에 실패했어요"
+      : "사진 배경을 지우고 있어요";
+
+  return (
+    <aside
+      className="home-processing-banner"
+      role="status"
+      aria-live="polite"
+      aria-label="사진 배경 제거 진행 중"
+    >
+      <div className="home-processing-banner-content">
+        <div className="home-processing-thumbnail" aria-hidden="true">
+          {imageSrc ? (
+            <img
+              alt=""
+              className="home-processing-thumbnail-image"
+              draggable={false}
+              src={imageSrc}
+            />
+          ) : (
+            <div className="home-processing-thumbnail-placeholder" />
+          )}
+          <div className="home-processing-scan-group">
+            <div className="home-processing-scan-body" />
+            <div className="home-processing-scan-boundary">
+              <div className="home-processing-scan-rectangle-27" />
+              <div className="home-processing-scan-rectangle-28" />
+            </div>
+          </div>
+        </div>
+        <div className="home-processing-copy">
+          <div
+            className="home-processing-progress"
+            aria-hidden="true"
+          >
+            <div
+              className="home-processing-progress-state"
+              data-status={status}
+              style={{ transform: `scaleX(${safeProgress / 100})` }}
+            />
+          </div>
+          <p className="home-processing-title">{title}</p>
+        </div>
+      </div>
+    </aside>
+  );
+};
 
 const requiredAgreementItems: Array<{
   hasViewButton?: boolean;
@@ -522,9 +624,6 @@ export const HomeDefault = (): JSX.Element => {
     useState(false);
   const [isItemFlowSaving, setIsItemFlowSaving] = useState(false);
   const [isLoginToastVisible, setIsLoginToastVisible] = useState(false);
-  const [isPhotoPreparingToastVisible, setIsPhotoPreparingToastVisible] =
-    useState(false);
-  const [photoPreparingDotCount, setPhotoPreparingDotCount] = useState(1);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [actionFailureToastMessage, setActionFailureToastMessage] =
     useState("");
@@ -540,6 +639,16 @@ export const HomeDefault = (): JSX.Element => {
   const [itemFlowStep, setItemFlowStep] = useState<ItemFlowStep>(null);
   const [selectedItemImageFile, setSelectedItemImageFile] =
     useState<File | null>(null);
+  const [processingBanner, setProcessingBanner] =
+    useState<ProcessingBannerState | null>(null);
+  const [failedProcessingSnapshot, setFailedProcessingSnapshot] =
+    useState<PendingItemCreateSnapshot | null>(null);
+  const [isProcessingFailureSheetOpen, setIsProcessingFailureSheetOpen] =
+    useState(false);
+  const [isClosingProcessingFailureSheet, setIsClosingProcessingFailureSheet] =
+    useState(false);
+  const [isProcessingRecoverySaving, setIsProcessingRecoverySaving] =
+    useState(false);
   const [uploadedOriginalImageUrl, setUploadedOriginalImageUrl] = useState("");
   const [pendingRemovedBgImageUrl, setPendingRemovedBgImageUrl] = useState("");
   const [hasBackgroundRemovalFailed, setHasBackgroundRemovalFailed] =
@@ -582,14 +691,16 @@ export const HomeDefault = (): JSX.Element => {
   const transitionFrameRef = useRef<number | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
+  const failurePhotoInputRef = useRef<HTMLInputElement | null>(null);
   const backgroundFailureToastTimerRef = useRef<number | null>(null);
   const backgroundRemovalFailedRef = useRef(false);
   const backgroundRemovalPromiseRef = useRef<Promise<string | null> | null>(null);
   const imagePreparationRunRef = useRef(0);
   const originalImageUploadPromiseRef = useRef<Promise<string> | null>(null);
+  const processingBannerObjectUrlRef = useRef<string | null>(null);
+  const processingBannerExitTimerRef = useRef<number | null>(null);
+  const processingFailureSheetTimerRef = useRef<number | null>(null);
   const loginToastTimerRef = useRef<number | null>(null);
-  const photoPreparingToastTimerRef = useRef<number | null>(null);
-  const photoPreparingDotsTimerRef = useRef<number | null>(null);
   const actionFailureToastTimerRef = useRef<number | null>(null);
   const sharePreviewRunRef = useRef(0);
   const shareSheetDragRef = useRef<{ startY: number } | null>(null);
@@ -1072,35 +1183,6 @@ export const HomeDefault = (): JSX.Element => {
       }, LOGIN_TOAST_MS);
     });
   };
-  const showPhotoPreparingToast = () => {
-    if (photoPreparingToastTimerRef.current !== null) {
-      window.clearTimeout(photoPreparingToastTimerRef.current);
-      photoPreparingToastTimerRef.current = null;
-    }
-    if (photoPreparingDotsTimerRef.current === null) {
-      photoPreparingDotsTimerRef.current = window.setInterval(() => {
-        setPhotoPreparingDotCount((currentCount) =>
-          currentCount >= 3 ? 1 : currentCount + 1,
-        );
-      }, 420);
-    }
-
-    setPhotoPreparingDotCount(1);
-    setIsPhotoPreparingToastVisible(true);
-  };
-  const hidePhotoPreparingToast = () => {
-    if (photoPreparingToastTimerRef.current !== null) {
-      window.clearTimeout(photoPreparingToastTimerRef.current);
-      photoPreparingToastTimerRef.current = null;
-    }
-    if (photoPreparingDotsTimerRef.current !== null) {
-      window.clearInterval(photoPreparingDotsTimerRef.current);
-      photoPreparingDotsTimerRef.current = null;
-    }
-
-    setIsPhotoPreparingToastVisible(false);
-    setPhotoPreparingDotCount(1);
-  };
   const showActionFailureToast = (message: string) => {
     if (actionFailureToastTimerRef.current !== null) {
       window.clearTimeout(actionFailureToastTimerRef.current);
@@ -1142,6 +1224,109 @@ export const HomeDefault = (): JSX.Element => {
     setUploadedOriginalImageUrl("");
     setPendingRemovedBgImageUrl("");
     setHasBackgroundRemovalFailed(false);
+  };
+  const showProcessingBannerForFile = (imageFile: File | null) => {
+    if (!imageFile || typeof URL === "undefined") return;
+
+    if (processingBannerExitTimerRef.current !== null) {
+      window.clearTimeout(processingBannerExitTimerRef.current);
+      processingBannerExitTimerRef.current = null;
+    }
+    if (processingBannerObjectUrlRef.current) {
+      URL.revokeObjectURL(processingBannerObjectUrlRef.current);
+    }
+
+    const objectUrl = URL.createObjectURL(imageFile);
+    processingBannerObjectUrlRef.current = objectUrl;
+    setProcessingBanner({
+      imageUrl: objectUrl,
+      progress: 0,
+      status: "processing",
+    });
+  };
+  const clearProcessingBanner = () => {
+    if (processingBannerExitTimerRef.current !== null) {
+      window.clearTimeout(processingBannerExitTimerRef.current);
+      processingBannerExitTimerRef.current = null;
+    }
+    if (processingBannerObjectUrlRef.current) {
+      URL.revokeObjectURL(processingBannerObjectUrlRef.current);
+      processingBannerObjectUrlRef.current = null;
+    }
+    setProcessingBanner(null);
+  };
+  const showProcessingFailureSheet = (snapshot: PendingItemCreateSnapshot) => {
+    if (processingFailureSheetTimerRef.current !== null) {
+      window.clearTimeout(processingFailureSheetTimerRef.current);
+      processingFailureSheetTimerRef.current = null;
+    }
+
+    setFailedProcessingSnapshot(snapshot);
+    setIsProcessingRecoverySaving(false);
+    setIsClosingProcessingFailureSheet(false);
+    setIsProcessingFailureSheetOpen(true);
+  };
+  const closeProcessingFailureSheet = () => {
+    if (isClosingProcessingFailureSheet) return;
+
+    setIsClosingProcessingFailureSheet(true);
+    processingFailureSheetTimerRef.current = window.setTimeout(() => {
+      setIsProcessingFailureSheetOpen(false);
+      setIsClosingProcessingFailureSheet(false);
+      setFailedProcessingSnapshot(null);
+      setIsProcessingRecoverySaving(false);
+      clearProcessingBanner();
+      processingFailureSheetTimerRef.current = null;
+    }, ADD_SHEET_ANIMATION_MS);
+  };
+  const completeProcessingBanner = () => {
+    setIsProcessingFailureSheetOpen(false);
+    setIsClosingProcessingFailureSheet(false);
+    setFailedProcessingSnapshot(null);
+    setIsProcessingRecoverySaving(false);
+    setProcessingBanner((currentBanner) =>
+      currentBanner
+        ? { ...currentBanner, progress: 100, status: "completed" }
+        : currentBanner,
+    );
+
+    if (processingBannerExitTimerRef.current !== null) {
+      window.clearTimeout(processingBannerExitTimerRef.current);
+    }
+    processingBannerExitTimerRef.current = window.setTimeout(() => {
+      clearProcessingBanner();
+    }, 700);
+  };
+  const failProcessingBanner = (snapshot?: PendingItemCreateSnapshot) => {
+    setIsProcessingFailureSheetOpen(false);
+    setIsClosingProcessingFailureSheet(false);
+    setFailedProcessingSnapshot(null);
+    setIsProcessingRecoverySaving(false);
+    setProcessingBanner((currentBanner) =>
+      currentBanner
+        ? { ...currentBanner, progress: 100, status: "failed" }
+        : currentBanner,
+    );
+
+    if (processingBannerExitTimerRef.current !== null) {
+      window.clearTimeout(processingBannerExitTimerRef.current);
+      processingBannerExitTimerRef.current = null;
+    }
+
+    processingBannerExitTimerRef.current = window.setTimeout(() => {
+      clearProcessingBanner();
+    }, 700);
+  };
+  const closeItemFlowAfterSubmit = () => {
+    itemFlowStartedAtRef.current = null;
+    setItemFlowStep(null);
+    setIsItemDatePickerOpen(false);
+    setIsItemTimePickerOpen(false);
+    setEditingItem(null);
+    setIsItemFlowSaving(false);
+    setActionFailureToastMessage("");
+    setSelectedItemImageFile(null);
+    resetItemImagePreparation();
   };
   const openTermsSheet = () => {
     setIsTermsSheetOpen(true);
@@ -1231,6 +1416,12 @@ export const HomeDefault = (): JSX.Element => {
     setEditingItem(null);
     resetItemImagePreparation();
     setSelectedItemImageFile(imageFile);
+    void startSelectedItemImagePreparation(
+      toDatabaseDate(selectedFlowDate),
+      imageFile,
+    )?.catch((uploadError: unknown) => {
+      console.error("Failed to upload item image.", uploadError);
+    });
     setItemFlowStep("price");
     setItemPrice("");
     setItemCategory("");
@@ -1257,7 +1448,6 @@ export const HomeDefault = (): JSX.Element => {
     setIsItemTimePickerOpen(false);
     setEditingItem(null);
     setIsItemFlowSaving(false);
-    hidePhotoPreparingToast();
     setActionFailureToastMessage("");
     setSelectedItemImageFile(null);
     resetItemImagePreparation();
@@ -1508,8 +1698,11 @@ export const HomeDefault = (): JSX.Element => {
 
     return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   };
-  const startSelectedItemImagePreparation = (targetDate: string) => {
-    if (!selectedItemImageFile || !user?.id) return null;
+  const startSelectedItemImagePreparation = (
+    targetDate: string,
+    imageFile: File | null = selectedItemImageFile,
+  ) => {
+    if (!imageFile || !user?.id) return null;
 
     if (originalImageUploadPromiseRef.current) {
       return originalImageUploadPromiseRef.current;
@@ -1519,10 +1712,14 @@ export const HomeDefault = (): JSX.Element => {
     const tempKey = createPendingImageKey();
     const uploadPromise = uploadItemImage({
       date: targetDate,
-      file: selectedItemImageFile,
+      file: imageFile,
       userId: user.id,
     })
       .then((imageUrl) => {
+        if (imagePreparationRunRef.current !== runId) {
+          return imageUrl;
+        }
+
         if (imagePreparationRunRef.current === runId) {
           setUploadedOriginalImageUrl(imageUrl);
         }
@@ -1542,6 +1739,10 @@ export const HomeDefault = (): JSX.Element => {
         })
           .then((result) => {
             const removedBgImageUrl = result.removed_bg_image_url ?? null;
+
+            if (imagePreparationRunRef.current !== runId) {
+              return removedBgImageUrl;
+            }
 
             if (
               removedBgImageUrl &&
@@ -1565,6 +1766,11 @@ export const HomeDefault = (): JSX.Element => {
           })
           .catch((backgroundError: unknown) => {
             console.error("Failed to remove item background.", backgroundError);
+
+            if (imagePreparationRunRef.current !== runId) {
+              return null;
+            }
+
             backgroundRemovalFailedRef.current = true;
             trackEvent(analyticsEvents.BACKGROUND_REMOVE_FAILED, {
               ...getCommonAnalyticsProperties(),
@@ -1614,6 +1820,259 @@ export const HomeDefault = (): JSX.Element => {
         showActionFailureToast("이미지 업로드에 실패했어요. 다시 시도해주세요.");
       },
     );
+  };
+  const addCreatedItemFromSnapshot = async (
+    snapshot: PendingItemCreateSnapshot,
+    imageSrc: string,
+    removedBgImageSrc: string,
+  ) => {
+    let noSpendWasDeleted = false;
+
+    try {
+      if (snapshot.hadNoSpendDay) {
+        await deleteNoSpendDay(snapshot.userId, snapshot.targetDate);
+        noSpendWasDeleted = true;
+        unsetNoSpendStateForDate(
+          snapshot.targetCart.id,
+          snapshot.targetCart.dateKey,
+        );
+      }
+
+      const createdItem = await createItem({
+        cart_color: getCartColorValue(snapshot.targetCart),
+        category: snapshot.category as ItemCategory,
+        date: snapshot.targetDate,
+        original_image_url: imageSrc,
+        price: snapshot.price,
+        reason: snapshot.reason as ItemReason,
+        removed_bg_image_url: removedBgImageSrc,
+        user_id: snapshot.userId,
+      });
+      const nextItem = itemToSlotItem(createdItem, snapshot.existingItemsCount);
+
+      addCreatedDbItemToState(snapshot.targetCart.dateKey, nextItem);
+      addCartSlotItem(snapshot.targetCart.id, nextItem);
+      setItemDetailMetadata((currentMetadata) => ({
+        ...currentMetadata,
+        [getItemDetailKey(snapshot.targetCart.id, nextItem.id)]: {
+          categoryId: snapshot.category,
+          reasonId: snapshot.reason,
+          time: snapshot.itemTime,
+        },
+      }));
+      setCartDataVersion((version) => version + 1);
+      trackEvent(analyticsEvents.ITEM_CREATED, {
+        ...getCommonAnalyticsProperties(),
+        background_removed: removedBgImageSrc !== imageSrc,
+        category: snapshot.category,
+        did_change_time: snapshot.didChangeTime,
+        duration_ms: snapshot.elapsedMs,
+        has_category: Boolean(snapshot.category),
+        has_image: snapshot.hasSelectedImageFile,
+        has_reason: Boolean(snapshot.reason),
+        items_added_count_for_date: snapshot.existingItemsCount + 1,
+        price_range: getPriceRange(snapshot.priceInput),
+        selected_date: snapshot.targetCart.dateKey,
+      });
+
+      completeProcessingBanner();
+    } catch (error) {
+      console.error("Failed to save item.", error);
+      failProcessingBanner(snapshot);
+
+      if (snapshot.hadNoSpendDay && noSpendWasDeleted) {
+        setNoSpendStateForDate(snapshot.targetCart.id, snapshot.targetCart.dateKey);
+        void upsertNoSpendDay({
+          date: snapshot.targetDate,
+          user_id: snapshot.userId,
+        }).catch((restoreError: unknown) => {
+          console.error("Failed to restore no-spend day.", restoreError);
+        });
+      }
+
+      showActionFailureToast("저장에 실패했어요. 다시 시도해주세요.");
+    }
+  };
+  const getOriginalImageUrlForSnapshot = async (
+    snapshot: PendingItemCreateSnapshot,
+  ) => {
+    if (!snapshot.hasSelectedImageFile || !snapshot.imageFile) {
+      return snapshot.fallbackImageSrc;
+    }
+
+    return (
+      snapshot.uploadedOriginalImageUrl ||
+      (await snapshot.originalImageUploadPromise) ||
+      (await uploadItemImage({
+        date: snapshot.targetDate,
+        file: snapshot.imageFile,
+        userId: snapshot.userId,
+      }))
+    );
+  };
+  const processPendingItemCreate = async (
+    snapshot: PendingItemCreateSnapshot,
+  ) => {
+    let imageSrc = snapshot.fallbackImageSrc;
+    let removedBgImageSrc = snapshot.fallbackImageSrc;
+
+    try {
+      if (snapshot.hasSelectedImageFile && snapshot.imageFile) {
+        try {
+          imageSrc = await getOriginalImageUrlForSnapshot(snapshot);
+        } catch (uploadError) {
+          console.error("Failed to upload item image.", uploadError);
+          failProcessingBanner({
+            ...snapshot,
+            originalImageUploadPromise: null,
+            uploadedOriginalImageUrl: "",
+          });
+          showActionFailureToast(
+            "이미지 업로드에 실패했어요. 다시 시도해주세요.",
+          );
+          return;
+        }
+
+        const uploadedSnapshot: PendingItemCreateSnapshot = {
+          ...snapshot,
+          originalImageUploadPromise: Promise.resolve(imageSrc),
+          uploadedOriginalImageUrl: imageSrc,
+        };
+
+        if (uploadedSnapshot.pendingRemovedBgImageUrl) {
+          removedBgImageSrc = uploadedSnapshot.pendingRemovedBgImageUrl;
+        } else if (
+          uploadedSnapshot.backgroundRemovalPromise &&
+          !uploadedSnapshot.backgroundRemovalAlreadyFailed
+        ) {
+          const removedBgImageUrl = await uploadedSnapshot.backgroundRemovalPromise;
+
+          if (!removedBgImageUrl) {
+            showBackgroundFailureToast();
+            removedBgImageSrc = imageSrc;
+          } else {
+            removedBgImageSrc = removedBgImageUrl;
+          }
+        } else if (uploadedSnapshot.backgroundRemovalAlreadyFailed) {
+          showBackgroundFailureToast();
+          removedBgImageSrc = imageSrc;
+        } else {
+          try {
+            const result = await removeItemBackground({
+              date: uploadedSnapshot.targetDate,
+              image_url: imageSrc,
+              temp_key: createPendingImageKey(),
+              user_id: uploadedSnapshot.userId,
+            });
+            const removedBgImageUrl = result.removed_bg_image_url ?? null;
+
+            if (!removedBgImageUrl) {
+              showBackgroundFailureToast();
+              removedBgImageSrc = imageSrc;
+            } else {
+              removedBgImageSrc = removedBgImageUrl;
+            }
+          } catch (backgroundError) {
+            console.error("Failed to remove item background.", backgroundError);
+            showBackgroundFailureToast();
+            removedBgImageSrc = imageSrc;
+          }
+        }
+      }
+
+      await addCreatedItemFromSnapshot(snapshot, imageSrc, removedBgImageSrc);
+    } catch (error) {
+      console.error("Failed to process pending item.", error);
+      failProcessingBanner(snapshot);
+      showActionFailureToast("저장에 실패했어요. 다시 시도해주세요.");
+    }
+  };
+  const createRetrySnapshot = (
+    snapshot: PendingItemCreateSnapshot,
+    imageFile: File | null = snapshot.imageFile,
+  ): PendingItemCreateSnapshot => ({
+    ...snapshot,
+    backgroundRemovalAlreadyFailed: false,
+    backgroundRemovalPromise: null,
+    hasSelectedImageFile: Boolean(imageFile),
+    imageFile,
+    originalImageUploadPromise:
+      imageFile === snapshot.imageFile && snapshot.uploadedOriginalImageUrl
+        ? Promise.resolve(snapshot.uploadedOriginalImageUrl)
+        : null,
+    pendingRemovedBgImageUrl: "",
+    uploadedOriginalImageUrl:
+      imageFile === snapshot.imageFile ? snapshot.uploadedOriginalImageUrl : "",
+  });
+  const retryFailedProcessing = () => {
+    if (!failedProcessingSnapshot?.imageFile || isProcessingRecoverySaving) {
+      return;
+    }
+
+    const retrySnapshot = createRetrySnapshot(failedProcessingSnapshot);
+    setFailedProcessingSnapshot(null);
+    setIsProcessingFailureSheetOpen(false);
+    setIsClosingProcessingFailureSheet(false);
+    setIsProcessingRecoverySaving(false);
+    showProcessingBannerForFile(retrySnapshot.imageFile);
+    void processPendingItemCreate(retrySnapshot);
+  };
+  const openFailurePhotoPicker = () => {
+    if (isProcessingRecoverySaving) return;
+
+    failurePhotoInputRef.current?.click();
+  };
+  const handleFailurePhotoSelection = (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const imageFile = event.currentTarget.files?.[0] ?? null;
+    event.currentTarget.value = "";
+
+    if (!imageFile || !failedProcessingSnapshot || isProcessingRecoverySaving) {
+      return;
+    }
+
+    const nextSnapshot = createRetrySnapshot(failedProcessingSnapshot, imageFile);
+    setFailedProcessingSnapshot(null);
+    setIsProcessingFailureSheetOpen(false);
+    setIsClosingProcessingFailureSheet(false);
+    setIsProcessingRecoverySaving(false);
+    showProcessingBannerForFile(imageFile);
+    void processPendingItemCreate(nextSnapshot);
+  };
+  const useOriginalImageForFailedProcessing = async () => {
+    const snapshot = failedProcessingSnapshot;
+
+    if (!snapshot || isProcessingRecoverySaving) return;
+
+    setIsProcessingRecoverySaving(true);
+
+    try {
+      const originalImageUrl = await getOriginalImageUrlForSnapshot(snapshot);
+      const originalSnapshot: PendingItemCreateSnapshot = {
+        ...snapshot,
+        backgroundRemovalAlreadyFailed: false,
+        backgroundRemovalPromise: null,
+        originalImageUploadPromise: Promise.resolve(originalImageUrl),
+        pendingRemovedBgImageUrl: "",
+        uploadedOriginalImageUrl: originalImageUrl,
+      };
+
+      setIsProcessingFailureSheetOpen(false);
+      setIsClosingProcessingFailureSheet(false);
+      setFailedProcessingSnapshot(null);
+      await addCreatedItemFromSnapshot(
+        originalSnapshot,
+        originalImageUrl,
+        originalImageUrl,
+      );
+    } catch (error) {
+      console.error("Failed to save original item image.", error);
+      failProcessingBanner(snapshot);
+      showActionFailureToast("저장에 실패했어요. 다시 시도해주세요.");
+    } finally {
+      setIsProcessingRecoverySaving(false);
+    }
   };
   const saveItemFlow = async () => {
     if (!isPriceReady || isItemFlowSaving) return;
@@ -1735,129 +2194,38 @@ export const HomeDefault = (): JSX.Element => {
       effectiveNoSpendCartIds.has(targetCartId) ||
       dbCartData.noSpendDateKeys.has(targetDateKey);
 
-    setIsItemFlowSaving(true);
+    const snapshot: PendingItemCreateSnapshot = {
+      backgroundRemovalAlreadyFailed:
+        hasBackgroundRemovalFailed || backgroundRemovalFailedRef.current,
+      backgroundRemovalPromise: backgroundRemovalPromiseRef.current,
+      category: itemCategory,
+      didChangeTime: getDidChangeTime(),
+      elapsedMs: getItemFlowElapsedMs(),
+      existingItemsCount:
+        (dbCartData.slotItemsByDate[targetDateKey] ?? []).length,
+      fallbackImageSrc,
+      hadNoSpendDay,
+      hasSelectedImageFile: Boolean(selectedItemImageFile),
+      imageFile: selectedItemImageFile,
+      itemTime,
+      originalImageUploadPromise: originalImageUploadPromiseRef.current,
+      pendingRemovedBgImageUrl,
+      price: Number(itemPrice),
+      priceInput: itemPrice,
+      reason: itemReason,
+      targetCart: {
+        dateKey: targetDateKey,
+        id: targetCartId,
+        imageAlt: targetCart.imageAlt,
+      },
+      targetDate,
+      uploadedOriginalImageUrl,
+      userId,
+    };
 
-    try {
-      const hasSelectedImageFile = Boolean(selectedItemImageFile);
-      let imageSrc = fallbackImageSrc;
-      let removedBgImageSrc = fallbackImageSrc;
-      let shouldShowBackgroundFailureToast = false;
-
-      if (hasSelectedImageFile) {
-        try {
-          imageSrc =
-            uploadedOriginalImageUrl ||
-            (await (originalImageUploadPromiseRef.current ??
-              startSelectedItemImagePreparation(targetDate))) ||
-            fallbackImageSrc;
-        } catch (uploadError) {
-          console.error("Failed to upload item image.", uploadError);
-          showActionFailureToast(
-            "이미지 업로드에 실패했어요. 다시 시도해주세요.",
-          );
-          setIsItemFlowSaving(false);
-          return;
-        }
-
-        removedBgImageSrc = pendingRemovedBgImageUrl || imageSrc;
-
-        const pendingRemovalPromise = backgroundRemovalPromiseRef.current;
-        const backgroundRemovalAlreadyFailed =
-          hasBackgroundRemovalFailed || backgroundRemovalFailedRef.current;
-
-        if (
-          pendingRemovalPromise &&
-          !pendingRemovedBgImageUrl &&
-          !backgroundRemovalAlreadyFailed
-        ) {
-          trackEvent(analyticsEvents.BACKGROUND_REMOVE_WAIT_SHOWN, {
-            ...getCommonAnalyticsProperties(),
-            elapsed_ms: getItemFlowElapsedMs(),
-            selected_date: targetDateKey,
-          });
-          showPhotoPreparingToast();
-          const removedBgImageUrl = await pendingRemovalPromise;
-          hidePhotoPreparingToast();
-
-          if (removedBgImageUrl) {
-            removedBgImageSrc = removedBgImageUrl;
-          } else {
-            removedBgImageSrc = imageSrc;
-            shouldShowBackgroundFailureToast = true;
-          }
-        } else if (backgroundRemovalAlreadyFailed) {
-          removedBgImageSrc = imageSrc;
-          shouldShowBackgroundFailureToast = true;
-        }
-      } else {
-        removedBgImageSrc = imageSrc;
-      }
-
-      if (hadNoSpendDay) {
-        await deleteNoSpendDay(userId, targetDate);
-        unsetNoSpendStateForDate(targetCartId, targetDateKey);
-      }
-
-      const createdItem = await createItem({
-        cart_color: getCartColorValue(targetCart),
-        category: itemCategory as ItemCategory,
-        date: targetDate,
-        original_image_url: imageSrc,
-        price: Number(itemPrice),
-        reason: itemReason as ItemReason,
-        removed_bg_image_url: removedBgImageSrc,
-        user_id: userId,
-      });
-      const existingItems = dbCartData.slotItemsByDate[targetDateKey] ?? [];
-      const nextItem = itemToSlotItem(createdItem, existingItems.length);
-
-      addCreatedDbItemToState(targetDateKey, nextItem);
-      addCartSlotItem(targetCartId, nextItem);
-      setItemDetailMetadata((currentMetadata) => ({
-        ...currentMetadata,
-        [getItemDetailKey(targetCartId, nextItem.id)]: {
-          categoryId: itemCategory,
-          reasonId: itemReason,
-          time: itemTime,
-        },
-      }));
-      setCartDataVersion((version) => version + 1);
-      trackEvent(analyticsEvents.ITEM_CREATED, {
-        ...getCommonAnalyticsProperties(),
-        background_removed: removedBgImageSrc !== imageSrc,
-        category: itemCategory,
-        did_change_time: getDidChangeTime(),
-        duration_ms: getItemFlowElapsedMs(),
-        has_category: Boolean(itemCategory),
-        has_image: hasSelectedImageFile,
-        has_reason: Boolean(itemReason),
-        items_added_count_for_date: existingItems.length + 1,
-        price_range: getPriceRange(itemPrice),
-        selected_date: targetDateKey,
-      });
-      itemFlowStartedAtRef.current = null;
-      closeItemFlow();
-
-      if (hasSelectedImageFile && shouldShowBackgroundFailureToast) {
-        showBackgroundFailureToast();
-      }
-    } catch (error) {
-      console.error("Failed to save item.", error);
-      hidePhotoPreparingToast();
-
-      if (hadNoSpendDay) {
-        setNoSpendStateForDate(targetCartId, targetDateKey);
-        void upsertNoSpendDay({
-          date: targetDate,
-          user_id: userId,
-        }).catch((restoreError: unknown) => {
-          console.error("Failed to restore no-spend day.", restoreError);
-        });
-      }
-
-      showActionFailureToast("저장에 실패했어요. 다시 시도해주세요.");
-      setIsItemFlowSaving(false);
-    }
+    showProcessingBannerForFile(snapshot.imageFile);
+    closeItemFlowAfterSubmit();
+    void processPendingItemCreate(snapshot);
   };
   const handleItemPriceChange = (value: string) => {
     const nextPrice = value.replace(/[^\d]/g, "");
@@ -2139,14 +2507,20 @@ export const HomeDefault = (): JSX.Element => {
     if (loginToastTimerRef.current !== null) {
       window.clearTimeout(loginToastTimerRef.current);
     }
-    if (photoPreparingToastTimerRef.current !== null) {
-      window.clearTimeout(photoPreparingToastTimerRef.current);
-    }
-    if (photoPreparingDotsTimerRef.current !== null) {
-      window.clearInterval(photoPreparingDotsTimerRef.current);
-    }
     if (actionFailureToastTimerRef.current !== null) {
       window.clearTimeout(actionFailureToastTimerRef.current);
+    }
+    if (backgroundFailureToastTimerRef.current !== null) {
+      window.clearTimeout(backgroundFailureToastTimerRef.current);
+    }
+    if (processingBannerExitTimerRef.current !== null) {
+      window.clearTimeout(processingBannerExitTimerRef.current);
+    }
+    if (processingFailureSheetTimerRef.current !== null) {
+      window.clearTimeout(processingFailureSheetTimerRef.current);
+    }
+    if (processingBannerObjectUrlRef.current) {
+      URL.revokeObjectURL(processingBannerObjectUrlRef.current);
     }
   }, []);
 
@@ -2416,6 +2790,17 @@ export const HomeDefault = (): JSX.Element => {
   };
   const todayDateKey = getKoreaToday();
   const isTodaySelected = cartDates[selectedIndex] === todayDateKey;
+  const shouldShowProcessingBanner =
+    Boolean(processingBanner) && !isProcessingFailureSheetOpen;
+  const processingBannerNotice = shouldShowProcessingBanner && processingBanner ? (
+    <div className="home-processing-banner-slot">
+      <HomeProcessingBanner
+        imageSrc={processingBanner.imageUrl}
+        progress={processingBanner.progress}
+        status={processingBanner.status}
+      />
+    </div>
+  ) : null;
   const recordedDates = dateCarts.flatMap((cart) =>
     getDisplayCartSummary(cart.id, cart.dateKey).itemCount > 0 ||
     effectiveNoSpendCartIds.has(cart.id)
@@ -2424,6 +2809,22 @@ export const HomeDefault = (): JSX.Element => {
   );
   const itemDateIndex = Math.max(cartDates.indexOf(itemDate), 0);
   const isPriceReady = itemPrice.length > 0;
+
+  useEffect(() => {
+    if (!processingBanner) return;
+
+    const progressTimer = window.setTimeout(() => {
+      setProcessingBanner((currentBanner) =>
+        currentBanner && currentBanner.status === "processing"
+          ? { ...currentBanner, progress: Math.max(currentBanner.progress, 84) }
+          : currentBanner,
+      );
+    }, 80);
+
+    return () => {
+      window.clearTimeout(progressTimer);
+    };
+  }, [processingBanner?.imageUrl]);
 
   useEffect(() => {
     if (!isAuthReady || !isAuthenticated || !user?.id) {
@@ -3120,28 +3521,6 @@ export const HomeDefault = (): JSX.Element => {
             </div>
           </section>
         )}
-        {isPhotoPreparingToastVisible && (
-          <div
-            className="login-required-toast photo-preparing-toast"
-            role="status"
-            aria-live="polite"
-          >
-            <img
-              alt=""
-              aria-hidden="true"
-              className="login-required-toast-icon"
-              src="/icons/icon-sparkle.svg"
-            />
-            <span className="photo-preparing-toast-copy">
-              <span className="photo-preparing-toast-text">
-                사진을 준비 중이에요
-              </span>
-              <span className="photo-preparing-toast-dots">
-                {".".repeat(photoPreparingDotCount)}
-              </span>
-            </span>
-          </div>
-        )}
       </main>
     );
   }
@@ -3151,161 +3530,166 @@ export const HomeDefault = (): JSX.Element => {
       className="flex flex-col min-h-screen items-start relative bg-white"
       data-model-id="2352:157735"
     >
-      <header className="app-shell-fixed-x flex items-center justify-around gap-[104px] px-5 py-2 fixed top-0 z-[10] bg-white">
-        <div className="flex items-center justify-between relative flex-1 grow">
-          <div className="inline-flex items-center gap-3 relative flex-[0_0_auto]">
-            <button
-              type="button"
-              aria-label="날짜 선택"
-              className="inline-flex items-center gap-1 px-0 py-0.5 relative flex-[0_0_auto]"
-              data-typography-semantic-mode="english"
-              onClick={() =>
-                isLoggedOutStart ? showLoginToast() : setIsDatePickerOpen(true)
-              }
-            >
-              <time
-                dateTime={cartDates[selectedIndex].replaceAll(".", "-")}
-                className="relative w-fit mt-[-1.00px] font-title-small font-[number:var(--title-small-font-weight)] text-zinc-800 text-[length:var(--title-small-font-size)] tracking-[var(--title-small-letter-spacing)] leading-[var(--title-small-line-height)] whitespace-nowrap [font-style:var(--title-small-font-style)]"
-              >
-                {cartDates[selectedIndex]}
-              </time>
-              <div className="inline-flex items-center gap-2.5 relative self-stretch flex-[0_0_auto]">
-                <div className="inline-flex flex-col items-center justify-center relative flex-[0_0_auto]">
-                  <img
-                    className="relative h-4"
-                    alt="Icon variant"
-                    src="https://c.animaapp.com/RVtpFFFT/img/--icon-variant---6.svg"
-                  />
-                </div>
-              </div>
-            </button>
-          </div>
-          <div className="inline-flex items-center gap-2 relative self-stretch flex-[0_0_auto]">
-            {!isTodaySelected && (
+      {processingBannerNotice}
+      {!shouldShowProcessingBanner && (
+        <header className="app-shell-fixed-x flex items-center justify-around gap-[104px] px-5 py-2 fixed top-0 z-[10] bg-white">
+          <div className="flex items-center justify-between relative flex-1 grow">
+            <div className="inline-flex items-center gap-3 relative flex-[0_0_auto]">
               <button
                 type="button"
-                className="today-return-chip"
-                onClick={() => selectDate(todayDateKey)}
+                aria-label="날짜 선택"
+                className="inline-flex items-center gap-1 px-0 py-0.5 relative flex-[0_0_auto]"
+                data-typography-semantic-mode="english"
+                onClick={() =>
+                  isLoggedOutStart ? showLoginToast() : setIsDatePickerOpen(true)
+                }
               >
-                <span className="today-return-chip-background" aria-hidden="true" />
-                <span className="today-return-chip-content">
-                  <span className="today-return-chip-text">오늘</span>
-                </span>
-              </button>
-            )}
-            <button
-              type="button"
-              aria-label="공유하기"
-              className="home-share-icon-button"
-              onClick={openShareSheet}
-            >
-              <img
-                alt=""
-                aria-hidden="true"
-                className="home-share-icon"
-                src="/icons/icon-share.svg"
-              />
-            </button>
-            <Link
-              aria-label="장바구니 색상 변경"
-              className="inline-flex items-center gap-5 relative self-stretch flex-[0_0_auto]"
-              to={`/home-edit-color?selectedIndex=${selectedIndex}&selectedDate=${cartDates[selectedIndex]}&railOffset=${Math.round(railOffset * 100) / 100}`}
-              state={{
-                railOffset,
-                selectedDate: cartDates[selectedIndex],
-                selectedIndex,
-              }}
-              onClick={(event) => {
-                if (!isLoggedOutStart) return;
-
-                event.preventDefault();
-                showLoginToast();
-              }}
-            >
-              <div className="inline-flex flex-col items-center justify-center relative flex-[0_0_auto]">
-                <div className="inline-flex flex-col items-center justify-center relative flex-[0_0_auto]">
-                  <ColorMenuButton
-                    color={dateCarts[selectedIndex]?.accentBgColor ?? "#FFE771"}
-                  />
+                <time
+                  dateTime={cartDates[selectedIndex].replaceAll(".", "-")}
+                  className="relative w-fit mt-[-1.00px] font-title-small font-[number:var(--title-small-font-weight)] text-zinc-800 text-[length:var(--title-small-font-size)] tracking-[var(--title-small-letter-spacing)] leading-[var(--title-small-line-height)] whitespace-nowrap [font-style:var(--title-small-font-style)]"
+                >
+                  {cartDates[selectedIndex]}
+                </time>
+                <div className="inline-flex items-center gap-2.5 relative self-stretch flex-[0_0_auto]">
+                  <div className="inline-flex flex-col items-center justify-center relative flex-[0_0_auto]">
+                    <img
+                      className="relative h-4"
+                      alt="Icon variant"
+                      src="https://c.animaapp.com/RVtpFFFT/img/--icon-variant---6.svg"
+                    />
+                  </div>
                 </div>
-                <div className="absolute w-[calc(100%_+_16px)] h-[calc(100%_+_16px)] -top-2 -left-2 rounded-full" />
-              </div>
-            </Link>
+              </button>
+            </div>
+            <div className="inline-flex items-center gap-2 relative self-stretch flex-[0_0_auto]">
+              {!isTodaySelected && (
+                <button
+                  type="button"
+                  className="today-return-chip"
+                  onClick={() => selectDate(todayDateKey)}
+                >
+                  <span className="today-return-chip-background" aria-hidden="true" />
+                  <span className="today-return-chip-content">
+                    <span className="today-return-chip-text">오늘</span>
+                  </span>
+                </button>
+              )}
+              <button
+                type="button"
+                aria-label="공유하기"
+                className="home-share-icon-button"
+                onClick={openShareSheet}
+              >
+                <img
+                  alt=""
+                  aria-hidden="true"
+                  className="home-share-icon"
+                  src="/icons/icon-share.svg"
+                />
+              </button>
+              <Link
+                aria-label="장바구니 색상 변경"
+                className="inline-flex items-center gap-5 relative self-stretch flex-[0_0_auto]"
+                to={`/home-edit-color?selectedIndex=${selectedIndex}&selectedDate=${cartDates[selectedIndex]}&railOffset=${Math.round(railOffset * 100) / 100}`}
+                state={{
+                  railOffset,
+                  selectedDate: cartDates[selectedIndex],
+                  selectedIndex,
+                }}
+                onClick={(event) => {
+                  if (!isLoggedOutStart) return;
+
+                  event.preventDefault();
+                  showLoginToast();
+                }}
+              >
+                <div className="inline-flex flex-col items-center justify-center relative flex-[0_0_auto]">
+                  <div className="inline-flex flex-col items-center justify-center relative flex-[0_0_auto]">
+                    <ColorMenuButton
+                      color={dateCarts[selectedIndex]?.accentBgColor ?? "#FFE771"}
+                    />
+                  </div>
+                  <div className="absolute w-[calc(100%_+_16px)] h-[calc(100%_+_16px)] -top-2 -left-2 rounded-full" />
+                </div>
+              </Link>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
       <section
         className="flex flex-col items-start relative flex-1 self-stretch w-full grow pt-20 pb-[112px]"
         aria-label="장바구니 화면"
       >
-        <div className="app-shell-fixed-x segment-control-scrim flex flex-col items-center justify-center px-5 py-2 fixed top-10 z-[10]">
-          <div
-            className="flex w-full h-full items-center gap-2.5 absolute top-0 left-0 pointer-events-none"
-            aria-hidden="true"
-          >
-            <img
-              className="relative flex-1 self-stretch grow"
-              alt="Gradient solid"
-              src="https://c.animaapp.com/RVtpFFFT/img/gradient-solid.svg"
-            />
-          </div>
-          <div className="inline-flex items-center p-1 relative flex-[0_0_auto] bg-[#71717a14] rounded-full backdrop-blur backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(8px)_brightness(100%)]">
+        {!shouldShowProcessingBanner && (
+          <div className="app-shell-fixed-x segment-control-scrim flex flex-col items-center justify-center px-5 py-2 fixed top-10 z-[10]">
             <div
-              className="inline-flex items-center gap-1 relative flex-[0_0_auto]"
-              role="tablist"
-              aria-label="보기 전환"
-              onPointerDownCapture={(event) => {
-                event.stopPropagation();
-                cancelDrag();
-              }}
-              onPointerUpCapture={(event) => event.stopPropagation()}
-              onTouchStartCapture={(event) => {
-                event.stopPropagation();
-                cancelDrag();
-              }}
-              onTouchEndCapture={(event) => event.stopPropagation()}
+              className="flex w-full h-full items-center gap-2.5 absolute top-0 left-0 pointer-events-none"
+              aria-hidden="true"
             >
-              {tabs.map((tab) => {
-                const isActive = tab.id === activeView;
+              <img
+                className="relative flex-1 self-stretch grow"
+                alt="Gradient solid"
+                src="https://c.animaapp.com/RVtpFFFT/img/gradient-solid.svg"
+              />
+            </div>
+            <div className="inline-flex items-center p-1 relative flex-[0_0_auto] bg-[#71717a14] rounded-full backdrop-blur backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(8px)_brightness(100%)]">
+              <div
+                className="inline-flex items-center gap-1 relative flex-[0_0_auto]"
+                role="tablist"
+                aria-label="보기 전환"
+                onPointerDownCapture={(event) => {
+                  event.stopPropagation();
+                  cancelDrag();
+                }}
+                onPointerUpCapture={(event) => event.stopPropagation()}
+                onTouchStartCapture={(event) => {
+                  event.stopPropagation();
+                  cancelDrag();
+                }}
+                onTouchEndCapture={(event) => event.stopPropagation()}
+              >
+                {tabs.map((tab) => {
+                  const isActive = tab.id === activeView;
 
-                return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  onPointerDownCapture={(event) => {
-                    event.stopPropagation();
-                    cancelDrag();
-                  }}
-                  onPointerUpCapture={(event) => event.stopPropagation()}
-                  onTouchStartCapture={(event) => {
-                    event.stopPropagation();
-                    cancelDrag();
-                  }}
-                  onTouchEndCapture={(event) => event.stopPropagation()}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    cancelDrag();
-                    switchView(tab.id as "cart" | "receipt");
-                  }}
-                  className={`inline-flex items-center justify-center gap-2 px-3 py-1.5 relative flex-[0_0_auto] rounded-full touch-manipulation ${
-                    isActive ? "bg-white tab-active-shadow" : ""
-                  }`}
-                >
-                  <div
-                    className={`relative w-fit mt-[-1.00px] font-label-small font-[number:var(--label-small-font-weight)] text-[length:var(--label-small-font-size)] tracking-[var(--label-small-letter-spacing)] leading-[var(--label-small-line-height)] whitespace-nowrap [font-style:var(--label-small-font-style)] ${
-                      isActive ? "text-zinc-800" : "text-[#11111170]"
+                  return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    onPointerDownCapture={(event) => {
+                      event.stopPropagation();
+                      cancelDrag();
+                    }}
+                    onPointerUpCapture={(event) => event.stopPropagation()}
+                    onTouchStartCapture={(event) => {
+                      event.stopPropagation();
+                      cancelDrag();
+                    }}
+                    onTouchEndCapture={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      cancelDrag();
+                      switchView(tab.id as "cart" | "receipt");
+                    }}
+                    className={`inline-flex items-center justify-center gap-2 px-3 py-1.5 relative flex-[0_0_auto] rounded-full touch-manipulation ${
+                      isActive ? "bg-white tab-active-shadow" : ""
                     }`}
                   >
-                    {tab.label}
-                  </div>
-                </button>
-                );
-              })}
+                    <div
+                      className={`relative w-fit mt-[-1.00px] font-label-small font-[number:var(--label-small-font-weight)] text-[length:var(--label-small-font-size)] tracking-[var(--label-small-letter-spacing)] leading-[var(--label-small-line-height)] whitespace-nowrap [font-style:var(--label-small-font-style)] ${
+                        isActive ? "text-zinc-800" : "text-[#11111170]"
+                      }`}
+                    >
+                      {tab.label}
+                    </div>
+                  </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        )}
         <div className="home-view-stage">
           {(activeView === "cart" ||
             transitionPhase === "cart-to-receipt" ||
@@ -3782,6 +4166,139 @@ export const HomeDefault = (): JSX.Element => {
           onClose={() => setIsDatePickerOpen(false)}
         />
       )}
+      {isProcessingFailureSheetOpen && (
+        <section
+          className="terms-sheet-overlay processing-failure-sheet-overlay"
+          aria-label="배경 제거 실패 복구"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            if (!isProcessingRecoverySaving) {
+              closeProcessingFailureSheet();
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape" || isProcessingRecoverySaving) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            closeProcessingFailureSheet();
+          }}
+        >
+          <div
+            className={`terms-sheet-backdrop ${
+              isClosingProcessingFailureSheet
+                ? "sheet-backdrop-out"
+                : "sheet-backdrop-in"
+            }`}
+            aria-hidden="true"
+          />
+          <div
+            className={`terms-sheet-content processing-failure-sheet-content ${
+              isClosingProcessingFailureSheet
+                ? "bottom-sheet-out"
+                : "bottom-sheet-in"
+            }`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="terms-sheet-handlebar">
+              <div className="terms-sheet-handlebar-mark" />
+            </div>
+            <div className="processing-failure-title-container">
+              <div className="processing-failure-title-copy">
+                <h2 className="processing-failure-title">
+                  배경 제거에 실패했어요.
+                </h2>
+                <p className="processing-failure-description">
+                  배경이 복잡한 사진은 배경 제거가 어려울 수 있어요.
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="그만두기"
+                className="processing-failure-close-button"
+                disabled={isProcessingRecoverySaving}
+                onClick={closeProcessingFailureSheet}
+              >
+                <img
+                  alt=""
+                  aria-hidden="true"
+                  className="processing-failure-icon"
+                  src="/icons/icon-close.svg"
+                />
+              </button>
+            </div>
+            <div className="processing-failure-preview-container">
+              <div className="processing-failure-preview-slot">
+                <div className="processing-failure-preview-frame">
+                  {processingBanner?.imageUrl ? (
+                    <img
+                      alt="배경 제거에 실패한 사진"
+                      className="processing-failure-preview-image"
+                      src={processingBanner.imageUrl}
+                    />
+                  ) : (
+                    <div className="processing-failure-preview-placeholder" />
+                  )}
+                  <div
+                    className="processing-failure-preview-dim"
+                    aria-hidden="true"
+                  />
+                  <button
+                    type="button"
+                    aria-label="재시도"
+                    className="processing-failure-retry-button"
+                    disabled={
+                      isProcessingRecoverySaving ||
+                      !failedProcessingSnapshot?.imageFile
+                    }
+                    onClick={retryFailedProcessing}
+                  >
+                    <img
+                      alt=""
+                      aria-hidden="true"
+                      className="processing-failure-icon"
+                      src="/icons/icon-reset.svg"
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="terms-action-area processing-failure-action-area">
+              <input
+                ref={failurePhotoInputRef}
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                tabIndex={-1}
+                onChange={handleFailurePhotoSelection}
+              />
+              <div className="terms-action-container processing-failure-action-container">
+                <button
+                  type="button"
+                  className="processing-failure-secondary-button"
+                  disabled={isProcessingRecoverySaving}
+                  onClick={useOriginalImageForFailedProcessing}
+                >
+                  원본 넣기
+                </button>
+                <button
+                  type="button"
+                  className="processing-failure-primary-button"
+                  disabled={isProcessingRecoverySaving}
+                  onClick={openFailurePhotoPicker}
+                >
+                  사진 바꾸기
+                </button>
+              </div>
+              <div
+                className="processing-failure-safe-area"
+                aria-hidden="true"
+              />
+            </div>
+          </div>
+        </section>
+      )}
       {isShareSheetOpen && (
         <section
           className="terms-sheet-overlay"
@@ -4166,7 +4683,7 @@ export const HomeDefault = (): JSX.Element => {
             className="login-required-toast-icon"
             src="/icons/icon-sparkle.svg"
           />
-          <span>배경 제거에 실패했어요. 원본 이미지로 저장했어요.</span>
+          <span>배경을 지울 수 없는 사진이에요.</span>
         </div>
       )}
     </main>

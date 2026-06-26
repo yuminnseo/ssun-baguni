@@ -48,6 +48,11 @@ export const itemToSlotItem = (item: Item, index: number): SlotItem => {
     amount: item.price,
     category: item.category,
     id: item.id,
+    isOriginalPhoto: Boolean(
+      item.original_image_url &&
+        item.removed_bg_image_url &&
+        item.removed_bg_image_url === item.original_image_url,
+    ),
     imageSrc:
       item.removed_bg_image_url ??
       item.original_image_url ??

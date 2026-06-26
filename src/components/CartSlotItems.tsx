@@ -18,6 +18,7 @@ export type SlotItem = {
   category?: string | null;
   id: string;
   imageSrc: string;
+  isOriginalPhoto?: boolean;
   rotation: number;
   size: number;
   tagOffset: Point;
@@ -660,7 +661,9 @@ export const CartSlotItems = ({
               aria-label="물품 위치 조정"
               className={`cart-slot-item ${
                 isItemDragging ? "cart-slot-item-dragging" : ""
-              } ${settlingIds.includes(item.id) ? "cart-slot-item-settling" : ""}`}
+              } ${settlingIds.includes(item.id) ? "cart-slot-item-settling" : ""} ${
+                item.isOriginalPhoto ? "cart-slot-item-original-photo" : ""
+              }`}
               style={
                 {
                   "--item-rotation": `${item.rotation}deg`,
@@ -685,7 +688,11 @@ export const CartSlotItems = ({
               }}
             >
               <img
-                className="h-full w-full object-contain"
+                className={
+                  item.isOriginalPhoto
+                    ? "cart-slot-item-photo cart-slot-item-photo-rounded"
+                    : "cart-slot-item-photo h-full w-full object-contain"
+                }
                 alt="구매 물품"
                 crossOrigin="anonymous"
                 decoding="async"
