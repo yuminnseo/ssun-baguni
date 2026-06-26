@@ -1298,6 +1298,10 @@ export const HomeDefault = (): JSX.Element => {
     }, 700);
   };
   const failProcessingBanner = (snapshot?: PendingItemCreateSnapshot) => {
+    setIsProcessingFailureSheetOpen(false);
+    setIsClosingProcessingFailureSheet(false);
+    setFailedProcessingSnapshot(null);
+    setIsProcessingRecoverySaving(false);
     setProcessingBanner((currentBanner) =>
       currentBanner
         ? { ...currentBanner, progress: 100, status: "failed" }
@@ -1309,9 +1313,9 @@ export const HomeDefault = (): JSX.Element => {
       processingBannerExitTimerRef.current = null;
     }
 
-    if (snapshot) {
-      showProcessingFailureSheet(snapshot);
-    }
+    processingBannerExitTimerRef.current = window.setTimeout(() => {
+      clearProcessingBanner();
+    }, 700);
   };
   const closeItemFlowAfterSubmit = () => {
     itemFlowStartedAtRef.current = null;
@@ -1412,6 +1416,12 @@ export const HomeDefault = (): JSX.Element => {
     setEditingItem(null);
     resetItemImagePreparation();
     setSelectedItemImageFile(imageFile);
+    void startSelectedItemImagePreparation(
+      toDatabaseDate(selectedFlowDate),
+      imageFile,
+    )?.catch((uploadError: unknown) => {
+      console.error("Failed to upload item image.", uploadError);
+    });
     setItemFlowStep("price");
     setItemPrice("");
     setItemCategory("");
@@ -1688,8 +1698,11 @@ export const HomeDefault = (): JSX.Element => {
 
     return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   };
-  const startSelectedItemImagePreparation = (targetDate: string) => {
-    if (!selectedItemImageFile || !user?.id) return null;
+  const startSelectedItemImagePreparation = (
+    targetDate: string,
+    imageFile: File | null = selectedItemImageFile,
+  ) => {
+    if (!imageFile || !user?.id) return null;
 
     if (originalImageUploadPromiseRef.current) {
       return originalImageUploadPromiseRef.current;
@@ -1699,10 +1712,14 @@ export const HomeDefault = (): JSX.Element => {
     const tempKey = createPendingImageKey();
     const uploadPromise = uploadItemImage({
       date: targetDate,
-      file: selectedItemImageFile,
+      file: imageFile,
       userId: user.id,
     })
       .then((imageUrl) => {
+        if (imagePreparationRunRef.current !== runId) {
+          return imageUrl;
+        }
+
         if (imagePreparationRunRef.current === runId) {
           setUploadedOriginalImageUrl(imageUrl);
         }
@@ -1722,6 +1739,10 @@ export const HomeDefault = (): JSX.Element => {
         })
           .then((result) => {
             const removedBgImageUrl = result.removed_bg_image_url ?? null;
+
+            if (imagePreparationRunRef.current !== runId) {
+              return removedBgImageUrl;
+            }
 
             if (
               removedBgImageUrl &&
@@ -1745,6 +1766,11 @@ export const HomeDefault = (): JSX.Element => {
           })
           .catch((backgroundError: unknown) => {
             console.error("Failed to remove item background.", backgroundError);
+
+            if (imagePreparationRunRef.current !== runId) {
+              return null;
+            }
+
             backgroundRemovalFailedRef.current = true;
             trackEvent(analyticsEvents.BACKGROUND_REMOVE_FAILED, {
               ...getCommonAnalyticsProperties(),
@@ -1922,23 +1948,14 @@ export const HomeDefault = (): JSX.Element => {
           const removedBgImageUrl = await uploadedSnapshot.backgroundRemovalPromise;
 
           if (!removedBgImageUrl) {
-            failProcessingBanner({
-              ...uploadedSnapshot,
-              backgroundRemovalAlreadyFailed: true,
-              backgroundRemovalPromise: null,
-              pendingRemovedBgImageUrl: "",
-            });
-            return;
+            showBackgroundFailureToast();
+            removedBgImageSrc = imageSrc;
+          } else {
+            removedBgImageSrc = removedBgImageUrl;
           }
-
-          removedBgImageSrc = removedBgImageUrl;
         } else if (uploadedSnapshot.backgroundRemovalAlreadyFailed) {
-          failProcessingBanner({
-            ...uploadedSnapshot,
-            backgroundRemovalPromise: null,
-            pendingRemovedBgImageUrl: "",
-          });
-          return;
+          showBackgroundFailureToast();
+          removedBgImageSrc = imageSrc;
         } else {
           try {
             const result = await removeItemBackground({
@@ -1950,25 +1967,15 @@ export const HomeDefault = (): JSX.Element => {
             const removedBgImageUrl = result.removed_bg_image_url ?? null;
 
             if (!removedBgImageUrl) {
-              failProcessingBanner({
-                ...uploadedSnapshot,
-                backgroundRemovalAlreadyFailed: true,
-                backgroundRemovalPromise: null,
-                pendingRemovedBgImageUrl: "",
-              });
-              return;
+              showBackgroundFailureToast();
+              removedBgImageSrc = imageSrc;
+            } else {
+              removedBgImageSrc = removedBgImageUrl;
             }
-
-            removedBgImageSrc = removedBgImageUrl;
           } catch (backgroundError) {
             console.error("Failed to remove item background.", backgroundError);
-            failProcessingBanner({
-              ...uploadedSnapshot,
-              backgroundRemovalAlreadyFailed: true,
-              backgroundRemovalPromise: null,
-              pendingRemovedBgImageUrl: "",
-            });
-            return;
+            showBackgroundFailureToast();
+            removedBgImageSrc = imageSrc;
           }
         }
       }
@@ -2502,6 +2509,9 @@ export const HomeDefault = (): JSX.Element => {
     }
     if (actionFailureToastTimerRef.current !== null) {
       window.clearTimeout(actionFailureToastTimerRef.current);
+    }
+    if (backgroundFailureToastTimerRef.current !== null) {
+      window.clearTimeout(backgroundFailureToastTimerRef.current);
     }
     if (processingBannerExitTimerRef.current !== null) {
       window.clearTimeout(processingBannerExitTimerRef.current);
@@ -4673,7 +4683,7 @@ export const HomeDefault = (): JSX.Element => {
             className="login-required-toast-icon"
             src="/icons/icon-sparkle.svg"
           />
-          <span>배경 제거에 실패했어요. 원본 이미지로 저장했어요.</span>
+          <span>배경을 지울 수 없는 사진이에요.</span>
         </div>
       )}
     </main>
