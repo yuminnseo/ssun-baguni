@@ -76,6 +76,7 @@ import {
   getProfile,
   markProfileTermsAgreed,
 } from "../../lib/data/profiles";
+import { isInAppBrowser } from "../../lib/inAppBrowser";
 import { useCartSwipe } from "../../useCartSwipe";
 
 const tabs = [
@@ -628,6 +629,9 @@ export const HomeDefault = (): JSX.Element => {
   const [actionFailureToastMessage, setActionFailureToastMessage] =
     useState("");
   const [isTermsSheetOpen, setIsTermsSheetOpen] = useState(false);
+  const [isInAppGuideSheetOpen, setIsInAppGuideSheetOpen] = useState(false);
+  const [isClosingInAppGuideSheet, setIsClosingInAppGuideSheet] =
+    useState(false);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const [isTermsAgreementLoading, setIsTermsAgreementLoading] =
     useState(false);
@@ -700,6 +704,7 @@ export const HomeDefault = (): JSX.Element => {
   const processingBannerObjectUrlRef = useRef<string | null>(null);
   const processingBannerExitTimerRef = useRef<number | null>(null);
   const processingFailureSheetTimerRef = useRef<number | null>(null);
+  const inAppGuideSheetTimerRef = useRef<number | null>(null);
   const loginToastTimerRef = useRef<number | null>(null);
   const actionFailureToastTimerRef = useRef<number | null>(null);
   const sharePreviewRunRef = useRef(0);
@@ -1331,11 +1336,35 @@ export const HomeDefault = (): JSX.Element => {
   const openTermsSheet = () => {
     setIsTermsSheetOpen(true);
   };
+  const openInAppGuideSheet = () => {
+    if (inAppGuideSheetTimerRef.current !== null) {
+      window.clearTimeout(inAppGuideSheetTimerRef.current);
+      inAppGuideSheetTimerRef.current = null;
+    }
+
+    setIsClosingInAppGuideSheet(false);
+    setIsInAppGuideSheetOpen(true);
+  };
+  const closeInAppGuideSheet = () => {
+    if (isClosingInAppGuideSheet) return;
+
+    setIsClosingInAppGuideSheet(true);
+    inAppGuideSheetTimerRef.current = window.setTimeout(() => {
+      setIsInAppGuideSheetOpen(false);
+      setIsClosingInAppGuideSheet(false);
+      inAppGuideSheetTimerRef.current = null;
+    }, ADD_SHEET_ANIMATION_MS);
+  };
   const startGoogleLogin = () => {
     trackEvent(analyticsEvents.LOGIN_BUTTON_CLICKED, {
       ...getCommonAnalyticsProperties(),
       source: "login_cta",
     });
+
+    if (isInAppBrowser()) {
+      openInAppGuideSheet();
+      return;
+    }
 
     if (!isSupabaseConfigured) {
       showLoginToast();
@@ -2518,6 +2547,9 @@ export const HomeDefault = (): JSX.Element => {
     }
     if (processingFailureSheetTimerRef.current !== null) {
       window.clearTimeout(processingFailureSheetTimerRef.current);
+    }
+    if (inAppGuideSheetTimerRef.current !== null) {
+      window.clearTimeout(inAppGuideSheetTimerRef.current);
     }
     if (processingBannerObjectUrlRef.current) {
       URL.revokeObjectURL(processingBannerObjectUrlRef.current);
@@ -4295,6 +4327,98 @@ export const HomeDefault = (): JSX.Element => {
                 className="processing-failure-safe-area"
                 aria-hidden="true"
               />
+            </div>
+          </div>
+        </section>
+      )}
+      {isInAppGuideSheetOpen && (
+        <section
+          className="terms-sheet-overlay in-app-login-guide-sheet-overlay"
+          aria-label="앱 내부 브라우저 로그인 안내"
+          role="dialog"
+          aria-modal="true"
+          onClick={closeInAppGuideSheet}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            closeInAppGuideSheet();
+          }}
+        >
+          <div
+            className={`terms-sheet-backdrop ${
+              isClosingInAppGuideSheet
+                ? "sheet-backdrop-out"
+                : "sheet-backdrop-in"
+            }`}
+            aria-hidden="true"
+          />
+          <div
+            className={`terms-sheet-content in-app-login-guide-sheet-content ${
+              isClosingInAppGuideSheet ? "bottom-sheet-out" : "bottom-sheet-in"
+            }`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="terms-sheet-handlebar">
+              <div className="terms-sheet-handlebar-mark" />
+            </div>
+            <div className="terms-sheet-container in-app-login-guide-container">
+              <div className="terms-sheet-content-slot in-app-login-guide-content">
+                <div className="in-app-login-guide-title-group">
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    className="in-app-login-guide-icon"
+                    src="/icons/icon-information-fill.svg"
+                  />
+                  <div className="in-app-login-guide-copy">
+                    <h2 className="in-app-login-guide-title">
+                      앱 안에서는 로그인이 막힐 수도 있어요
+                    </h2>
+                    <p className="in-app-login-guide-description">
+                      인스타그램, 스레드, 카카오톡 등 앱 내부에서는 구글 로그인이 제한될 수 있어요.
+                    </p>
+                  </div>
+                </div>
+                <div className="in-app-login-guide-help-box">
+                  <h3 className="in-app-login-guide-help-title">해결 방법</h3>
+                  <div className="in-app-login-guide-step-list">
+                    <div className="in-app-login-guide-step">
+                      <span className="in-app-login-guide-step-number">01</span>
+                      <p className="in-app-login-guide-step-copy">
+                        우측 상단 또는 하단에 있는 더보기(…), 혹은 메뉴 버튼을 눌러주세요.
+                      </p>
+                    </div>
+                    <div className="in-app-login-guide-step">
+                      <span className="in-app-login-guide-step-number">02</span>
+                      <p className="in-app-login-guide-step-copy">
+                        [브라우저에서 열기] 또는 [Safari으로 열기]를
+                        <br />
+                        선택해주세요.
+                      </p>
+                    </div>
+                    <div className="in-app-login-guide-step">
+                      <span className="in-app-login-guide-step-number">03</span>
+                      <p className="in-app-login-guide-step-copy">
+                        크롬, 사파리 등 웹 브라우저에서 로그인해주세요.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="terms-action-area">
+              <div className="terms-action-container">
+                <button
+                  type="button"
+                  className="in-app-login-guide-confirm-button"
+                  onClick={closeInAppGuideSheet}
+                >
+                  확인했어요
+                </button>
+              </div>
+              <div className="terms-safe-area" aria-hidden="true" />
             </div>
           </div>
         </section>

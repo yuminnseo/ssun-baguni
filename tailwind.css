@@ -1307,6 +1307,10 @@ body {
   width: 100%;
 }
 
+.terms-sheet-content.bottom-sheet-out {
+  animation: bottom-sheet-out 220ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
 .withdraw-sheet-content {
   overflow: hidden;
 }
@@ -1317,6 +1321,130 @@ body {
 
 .share-sheet-content {
   overflow: hidden;
+}
+
+.in-app-login-guide-sheet-content {
+  overflow: hidden;
+}
+
+.in-app-login-guide-container {
+  padding: 12px 20px 0;
+}
+
+.in-app-login-guide-content {
+  align-items: center;
+  gap: 20px;
+}
+
+.in-app-login-guide-title-group {
+  align-items: flex-start;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.in-app-login-guide-icon {
+  display: block;
+  height: 40px;
+  width: 40px;
+}
+
+.in-app-login-guide-copy {
+  align-items: flex-start;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.in-app-login-guide-title {
+  align-self: stretch;
+  color: #27272a;
+  font-family: "Pretendard", var(--font-base);
+  font-size: 20px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 24px;
+  margin: 0;
+}
+
+.in-app-login-guide-description {
+  align-self: stretch;
+  color: rgba(17, 17, 17, 0.44);
+  font-family: "Pretendard", var(--font-base);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 20px;
+  margin: 0;
+}
+
+.in-app-login-guide-help-box {
+  align-items: flex-start;
+  align-self: stretch;
+  background: #f7f7f8;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+  padding: 20px;
+}
+
+.in-app-login-guide-help-title {
+  align-self: stretch;
+  color: rgba(17, 17, 17, 0.64);
+  font-family: "Pretendard", var(--font-base);
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 20px;
+  margin: 0;
+}
+
+.in-app-login-guide-step-list {
+  align-items: flex-start;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.in-app-login-guide-step {
+  align-items: flex-start;
+  align-self: stretch;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.in-app-login-guide-step-number {
+  color: rgba(17, 17, 17, 0.64);
+  flex: 0 0 16px;
+  font-family: "Satoshi", var(--font-base);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 16px;
+}
+
+.in-app-login-guide-step-copy {
+  color: rgba(17, 17, 17, 0.64);
+  flex: 1 1 auto;
+  font-family: "Pretendard", var(--font-base);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 16px;
+  margin: 0;
+  min-width: 0;
 }
 
 .share-sheet-container {
@@ -1845,6 +1973,32 @@ body {
   cursor: not-allowed;
   opacity: 1;
   pointer-events: none;
+}
+
+.in-app-login-guide-confirm-button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid #111111;
+  border-radius: 12px;
+  color: #27272a;
+  cursor: pointer;
+  display: inline-flex;
+  font-family: "Pretendard", var(--font-base);
+  font-size: var(--label-large-font-size);
+  font-style: normal;
+  font-weight: var(--label-large-font-weight);
+  height: 48px;
+  justify-content: center;
+  letter-spacing: var(--label-large-letter-spacing);
+  line-height: var(--label-large-line-height);
+  padding: 12px 24px;
+  transition: opacity 150ms ease;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.in-app-login-guide-confirm-button:active {
+  opacity: 0.8;
 }
 
 .withdraw-secondary-button {
