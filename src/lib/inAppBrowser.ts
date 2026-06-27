@@ -1,6 +1,7 @@
 const IN_APP_BROWSER_PATTERNS = [
   /Instagram/i,
   /Threads/i,
+  /Barcelona/i,
   /KAKAOTALK/i,
   /FBAN/i,
   /FBAV/i,
