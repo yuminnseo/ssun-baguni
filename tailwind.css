@@ -2623,9 +2623,10 @@ body {
   align-items: flex-start;
   display: flex;
   gap: 64px;
+  left: 50%;
   position: relative;
   transform: translate3d(
-    calc(50vw - 124px - (312px * var(--item-detail-index))),
+    calc(-124px - (312px * var(--item-detail-index))),
     0,
     0
   );
@@ -2652,7 +2653,7 @@ body {
 }
 
 .item-detail-card-active {
-  transform: translateY(0) scale(1) rotate(0deg);
+  transform: translateY(-8px) scale(1) rotate(0deg);
 }
 
 .item-detail-card-active ~ .item-detail-card {
