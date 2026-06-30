@@ -28,9 +28,9 @@ Use the actual Vite, React Router, and browser-side React structure as the sourc
 
 ## Runtime Asset Baseline
 
-`vite.config.ts` currently sets `publicDir` to `./static`.
+`vite.config.ts` currently sets `publicDir` to `./assets`.
 
-That means runtime asset paths should be treated as coming from `static/`, including:
+That means runtime asset paths should be treated as coming from `assets/`, including:
 
 - `/icons`
 - `/cart`
@@ -96,7 +96,7 @@ The following files are strongly connected to current app behavior. Do not casua
 ## Current Structural Risks
 
 - `HomeDefault.tsx` is a very large file. It combines UI state, database reads and writes, Storage upload/delete behavior, background removal, Mixpanel tracking, share flows, terms agreement, and account withdrawal flows.
-- `static/` and `public/` both contain assets, which can make the real runtime asset source unclear.
+- `assets/` and `public/` both contain assets, which can make the real runtime asset source unclear.
 - `HomeDefault`, `HomeDefaultScreen`, and `HomeDefaultWrapper` may have overlapping or historical prototype roles. Confirm which screen is active before changing any of them.
 - `tailwind.css` is a large single CSS file.
 - Design tokens and color definitions are spread across CSS variables, TypeScript constants, and screen-level code.
