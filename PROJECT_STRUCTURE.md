@@ -39,7 +39,7 @@ That means runtime asset paths should be treated as coming from `assets/`, inclu
 - `/navigation-icons`
 - `/sticker`
 
-There are also duplicate assets under `public/`. Do not delete or move them until all references and build behavior have been checked.
+`public/` has been removed from the active runtime asset structure. Do not add new runtime frontend assets to `public/`; use `assets/` for runtime assets and `_reference/assets/` for archived originals or design references.
 
 ## Current Routing And Screen Baseline
 
@@ -96,7 +96,7 @@ The following files are strongly connected to current app behavior. Do not casua
 ## Current Structural Risks
 
 - `HomeDefault.tsx` is a very large file. It combines UI state, database reads and writes, Storage upload/delete behavior, background removal, Mixpanel tracking, share flows, terms agreement, and account withdrawal flows.
-- `assets/` and `public/` both contain assets, which can make the real runtime asset source unclear.
+- Runtime frontend assets are consolidated under `assets/`; archived design originals or reference assets live under `_reference/assets/`. Keep this separation to avoid reintroducing duplicate runtime assets.
 - `HomeDefault`, `HomeDefaultScreen`, and `HomeDefaultWrapper` may have overlapping or historical prototype roles. Confirm which screen is active before changing any of them.
 - `tailwind.css` is a large single CSS file.
 - Design tokens and color definitions are spread across CSS variables, TypeScript constants, and screen-level code.
