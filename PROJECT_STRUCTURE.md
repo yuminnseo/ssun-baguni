@@ -41,6 +41,43 @@ That means runtime asset paths should be treated as coming from `static/`, inclu
 
 There are also duplicate assets under `public/`. Do not delete or move them until all references and build behavior have been checked.
 
+## Current Routing And Screen Baseline
+
+The actual app entry flow is:
+
+1. `src/index.tsx`
+2. `App`
+3. `AuthProvider`
+4. `RouterProvider`
+5. `createBrowserRouter`
+
+Current major routes:
+
+- `/` falls through to the catch-all `/*` route and renders `HomeDefault`.
+- `/*` renders `HomeDefault`.
+- `/home-defaultu9501` renders `HomeDefault`.
+- `/home-defaultu95u4366u4462u4352u4449u4370u4449u4352u4469` renders `HomeDefault`.
+- `/home-defaultu95u4354u4449u4527u4365u4449u4363u4469u4355u4457u4540` renders `HomeDefaultScreen`. This is the long Anima-style `HomeDefaultScreen` route.
+- `/home-edit-color` renders `HomeEditColor`.
+- `/privacy` renders `LegalDocumentPage` with the privacy document.
+- `/terms` renders `LegalDocumentPage` with the terms document.
+
+The current real home screen baseline file is `src/screens/HomeDefault/HomeDefault.tsx`.
+
+`/` and other general paths are rendered by `HomeDefault` through the catch-all `/*` route. Future "home screen" work should use `src/screens/HomeDefault/HomeDefault.tsx` as the baseline unless a routing change explicitly says otherwise.
+
+Confusing home-like screens:
+
+- `HomeDefaultScreen` is only used by a specific long Anima-style route. It is not the current default home screen baseline.
+- `HomeDefaultWrapper` appears to be unused by the current router. It may be a cleanup candidate, but confirm whether it is kept for reference, QA, or prototype comparison before deleting it.
+- Both files look like home screens by name, so be explicit when giving work instructions.
+
+Deletion judgment:
+
+- `HomeDefault`: do not delete.
+- `HomeDefaultScreen`: hold.
+- `HomeDefaultWrapper`: deletion candidate, but do not delete before confirming its preservation purpose.
+
 ## High-Risk Files
 
 The following files are strongly connected to current app behavior. Do not casually edit, move, rename, or delete them.
