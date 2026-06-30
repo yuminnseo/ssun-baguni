@@ -78,6 +78,7 @@ export type Database = {
           id: string;
           original_image_url: string | null;
           price: number;
+          purchase_time: string | null;
           reason: ItemReason | null;
           removed_bg_image_url: string | null;
           updated_at: string;
@@ -91,6 +92,7 @@ export type Database = {
           id?: string;
           original_image_url?: string | null;
           price: number;
+          purchase_time?: string | null;
           reason?: ItemReason | null;
           removed_bg_image_url?: string | null;
           updated_at?: string;
@@ -104,6 +106,7 @@ export type Database = {
           id?: string;
           original_image_url?: string | null;
           price?: number;
+          purchase_time?: string | null;
           reason?: ItemReason | null;
           removed_bg_image_url?: string | null;
           updated_at?: string;

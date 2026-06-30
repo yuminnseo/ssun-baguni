@@ -1334,7 +1334,7 @@ export const HomeDefault = (): JSX.Element => {
     return {
       categoryId: "food",
       reasonId: "necessary",
-      time: "AM 09:12",
+      time: DEFAULT_ITEM_TIME,
     };
   };
   const getItemMetadata = (cartId: string, itemId: string) =>
@@ -1543,7 +1543,7 @@ export const HomeDefault = (): JSX.Element => {
   const updateDbItemInState = (
     dateKey: string,
     itemId: string,
-    updates: Partial<Pick<SlotItem, "amount" | "category" | "imageSrc">>,
+    updates: Partial<Pick<SlotItem, "amount" | "category" | "imageSrc" | "purchaseTime">>,
   ) => {
     setDbCartData((currentData) => ({
       ...currentData,
@@ -1708,6 +1708,7 @@ export const HomeDefault = (): JSX.Element => {
         date: snapshot.targetDate,
         original_image_url: imageSrc,
         price: snapshot.price,
+        purchase_time: snapshot.itemTime || DEFAULT_ITEM_TIME,
         reason: snapshot.reason as ItemReason,
         removed_bg_image_url: removedBgImageSrc,
         user_id: snapshot.userId,
@@ -1995,11 +1996,13 @@ export const HomeDefault = (): JSX.Element => {
           await updateItem(editingItem.itemId, {
             category: itemCategory as ItemCategory,
             price: nextAmount,
+            purchase_time: itemTime || DEFAULT_ITEM_TIME,
             reason: itemReason as ItemReason,
           });
           updateDbItemInState(editedCart.dateKey, editingItem.itemId, {
             amount: nextAmount,
             category: itemCategory,
+            purchaseTime: itemTime || DEFAULT_ITEM_TIME,
           });
         } catch (error) {
           console.error("Failed to update item.", error);
@@ -2012,6 +2015,7 @@ export const HomeDefault = (): JSX.Element => {
       updateCartSlotItem(editingItem.cartId, editingItem.itemId, {
         amount: nextAmount,
         category: itemCategory,
+        purchaseTime: itemTime || DEFAULT_ITEM_TIME,
       });
       setItemDetailMetadata((currentMetadata) => ({
         ...currentMetadata,
@@ -2771,10 +2775,18 @@ export const HomeDefault = (): JSX.Element => {
 
             if (!cart) continue;
 
-            nextMetadata[getItemDetailKey(cart.id, item.id)] = {
+            const detailKey = getItemDetailKey(cart.id, item.id);
+            const slotItem = fetchedSlotItemsByDate[toDateKey(item.date)]?.find(
+              (entry) => entry.id === item.id,
+            );
+
+            nextMetadata[detailKey] = {
               categoryId: item.category ?? "food",
               reasonId: item.reason ?? "necessary",
-              time: nextMetadata[getItemDetailKey(cart.id, item.id)]?.time ?? "AM 09:12",
+              time:
+                nextMetadata[detailKey]?.time ??
+                slotItem?.purchaseTime ??
+                DEFAULT_ITEM_TIME,
             };
           }
 

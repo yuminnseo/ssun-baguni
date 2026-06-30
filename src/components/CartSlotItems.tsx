@@ -19,6 +19,7 @@ export type SlotItem = {
   id: string;
   imageSrc: string;
   isOriginalPhoto?: boolean;
+  purchaseTime?: string | null;
   rotation: number;
   size: number;
   tagOffset: Point;
@@ -157,7 +158,7 @@ export const addCartSlotItem = (cartId: string, item: SlotItem) => {
 export const updateCartSlotItem = (
   cartId: string,
   itemId: string,
-  updates: Partial<Pick<SlotItem, "amount" | "category" | "imageSrc">>,
+  updates: Partial<Pick<SlotItem, "amount" | "category" | "imageSrc" | "purchaseTime">>,
 ) => {
   const items = getMutableCartItems(cartId);
   savedCartItems[cartId] = cloneItems(

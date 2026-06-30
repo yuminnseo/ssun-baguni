@@ -57,6 +57,7 @@ export const itemToSlotItem = (item: Item, index: number): SlotItem => {
       item.removed_bg_image_url ??
       item.original_image_url ??
       getFallbackImageSrc(item),
+    purchaseTime: item.purchase_time,
   };
 };
 
