@@ -31,7 +31,6 @@ import {
   itemToSlotItem,
   toDatabaseDate,
   toDateKey,
-  type SlotItemsByDate,
 } from "../../lib/data/cartSlotAdapter";
 import { getItemCategoryLabel } from "../../lib/data/itemCategories";
 import {
@@ -78,6 +77,18 @@ import {
 } from "../../lib/data/profiles";
 import { isInAppBrowser } from "../../lib/inAppBrowser";
 import { useCartSwipe } from "../../useCartSwipe";
+import type {
+  DbCartDataState,
+  DetailOverlayState,
+  EditingItemState,
+  HomeProcessingBannerProps,
+  ItemDetailMetadata,
+  ItemFlowStep,
+  PendingItemCreateSnapshot,
+  ProcessingBannerState,
+  RequiredAgreementKey,
+  WithdrawStep,
+} from "./types";
 
 const tabs = [
   { id: "cart", label: "장바구니" },
@@ -175,56 +186,6 @@ const removeTermsAgreement = (userId: string) => {
   if (typeof window === "undefined") return;
 
   window.localStorage.removeItem(getTermsAgreementStorageKey(userId));
-};
-
-type RequiredAgreementKey = "age" | "privacy" | "terms";
-type ItemFlowStep = "price" | "details" | null;
-type WithdrawStep = "warning" | "final";
-type ProcessingBannerStatus =
-  | "idle"
-  | "uploading"
-  | "processing"
-  | "completing"
-  | "completed"
-  | "failed";
-
-type ProcessingBannerState = {
-  imageUrl: string;
-  progress: number;
-  status: ProcessingBannerStatus;
-};
-
-type PendingItemCreateSnapshot = {
-  backgroundRemovalAlreadyFailed: boolean;
-  backgroundRemovalPromise: Promise<string | null> | null;
-  category: string;
-  didChangeTime: boolean;
-  elapsedMs: number | null;
-  existingItemsCount: number;
-  fallbackImageSrc: string;
-  hadNoSpendDay: boolean;
-  hasSelectedImageFile: boolean;
-  imageFile: File | null;
-  itemTime: string;
-  originalImageUploadPromise: Promise<string> | null;
-  pendingRemovedBgImageUrl: string;
-  price: number;
-  priceInput: string;
-  reason: string;
-  targetCart: {
-    dateKey: string;
-    id: string;
-    imageAlt: string;
-  };
-  targetDate: string;
-  uploadedOriginalImageUrl: string;
-  userId: string;
-};
-
-type HomeProcessingBannerProps = {
-  imageSrc: string;
-  progress: number;
-  status: ProcessingBannerStatus;
 };
 
 const HomeProcessingBanner = ({
@@ -389,32 +350,6 @@ const itemDetailActions = [
     iconSrc: "https://c.animaapp.com/B1LZS6bG/img/--icon-variant---1.svg",
   },
 ];
-
-type ItemDetailMetadata = {
-  categoryId: string;
-  reasonId: string;
-  time: string;
-};
-
-type DetailOverlayState = {
-  cartId: string;
-  itemId: string;
-  isClosing: boolean;
-} | null;
-
-type EditingItemState = {
-  cartId: string;
-  itemId: string;
-} | null;
-
-type DbReadStatus = "idle" | "loading" | "ready" | "error";
-
-type DbCartDataState = {
-  loadedDateKeys: Set<string>;
-  noSpendDateKeys: Set<string>;
-  slotItemsByDate: SlotItemsByDate;
-  status: DbReadStatus;
-};
 
 const baseCarts = [
   {
