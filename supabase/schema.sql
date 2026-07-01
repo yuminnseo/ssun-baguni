@@ -22,6 +22,7 @@ create table if not exists public.items (
   original_image_url text,
   removed_bg_image_url text,
   price integer not null check (price >= 0),
+  purchase_time text default 'AM 11:00',
   category text check (
     category is null or category in (
       'food',

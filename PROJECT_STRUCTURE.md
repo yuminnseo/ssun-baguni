@@ -93,6 +93,12 @@ The following files are strongly connected to current app behavior. Do not casua
 - `supabase/storage-policies.sql`
 - `tailwind.css`
 
+## Supabase Data Baseline
+
+`items.purchase_time` is a `text` column used to store the purchase time selected by the user in the item add/edit flow.
+
+Existing items were backfilled to `AM 11:00` through `supabase/add-purchase-time.sql`. `created_at` and `updated_at` are not purchase-time fields and should not be used as purchase-time fallbacks.
+
 ## Current Structural Risks
 
 - `HomeDefault.tsx` is a very large file. It combines UI state, database reads and writes, Storage upload/delete behavior, background removal, Mixpanel tracking, share flows, terms agreement, and account withdrawal flows.
