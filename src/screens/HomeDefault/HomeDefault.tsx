@@ -538,6 +538,7 @@ export const HomeDefault = (): JSX.Element => {
   const originalImageUploadPromiseRef = useRef<Promise<string> | null>(null);
   const processingBannerObjectUrlRef = useRef<string | null>(null);
   const processingBannerExitTimerRef = useRef<number | null>(null);
+  const processingBannerShownTrackedKeysRef = useRef<Set<string>>(new Set());
   const processingFailureSheetTimerRef = useRef<number | null>(null);
   const inAppGuideSheetTimerRef = useRef<number | null>(null);
   const loginToastTimerRef = useRef<number | null>(null);
@@ -1065,7 +1066,10 @@ export const HomeDefault = (): JSX.Element => {
     setPendingRemovedBgImageUrl("");
     setHasBackgroundRemovalFailed(false);
   };
-  const showProcessingBannerForFile = (imageFile: File | null) => {
+  const showProcessingBannerForFile = (
+    imageFile: File | null,
+    analytics?: ProcessingBannerState["analytics"],
+  ) => {
     if (!imageFile || typeof URL === "undefined") return;
 
     if (processingBannerExitTimerRef.current !== null) {
@@ -1079,6 +1083,7 @@ export const HomeDefault = (): JSX.Element => {
     const objectUrl = URL.createObjectURL(imageFile);
     processingBannerObjectUrlRef.current = objectUrl;
     setProcessingBanner({
+      analytics,
       imageUrl: objectUrl,
       progress: 0,
       status: "processing",
@@ -2091,7 +2096,16 @@ export const HomeDefault = (): JSX.Element => {
       userId,
     };
 
-    showProcessingBannerForFile(snapshot.imageFile);
+    showProcessingBannerForFile(snapshot.imageFile, {
+      backgroundRemoveAlreadyStarted:
+        Boolean(snapshot.pendingRemovedBgImageUrl) ||
+        Boolean(snapshot.backgroundRemovalPromise) ||
+        snapshot.backgroundRemovalAlreadyFailed,
+      backgroundRemoveHadPromise: Boolean(snapshot.backgroundRemovalPromise),
+      hasImage: snapshot.hasSelectedImageFile,
+      priceRange: getPriceRange(snapshot.priceInput),
+      selectedDate: snapshot.targetCart.dateKey,
+    });
     closeItemFlowAfterSubmit();
     void processPendingItemCreate(snapshot);
   };
@@ -2696,6 +2710,27 @@ export const HomeDefault = (): JSX.Element => {
       window.clearTimeout(progressTimer);
     };
   }, [processingBanner?.imageUrl]);
+
+  useEffect(() => {
+    if (!shouldShowProcessingBanner || !processingBanner?.analytics) return;
+
+    const trackingKey = processingBanner.imageUrl;
+    if (processingBannerShownTrackedKeysRef.current.has(trackingKey)) return;
+    processingBannerShownTrackedKeysRef.current.add(trackingKey);
+
+    trackEvent(analyticsEvents.BACKGROUND_REMOVE_PROCESSING_BANNER_SHOWN, {
+      ...getCommonAnalyticsProperties(),
+      background_remove_already_started:
+        processingBanner.analytics.backgroundRemoveAlreadyStarted,
+      background_remove_had_promise:
+        processingBanner.analytics.backgroundRemoveHadPromise,
+      has_image: processingBanner.analytics.hasImage,
+      price_range: processingBanner.analytics.priceRange,
+      selected_date: processingBanner.analytics.selectedDate,
+      source: "processing_banner",
+      ui_variant: "processing_banner",
+    });
+  }, [processingBanner?.imageUrl, shouldShowProcessingBanner]);
 
   useEffect(() => {
     if (!isAuthReady || !isAuthenticated || !user?.id) {

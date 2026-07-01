@@ -14,6 +14,8 @@ export const analyticsEvents = {
   APP_OPENED: "app_opened",
   BACKGROUND_REMOVE_COMPLETED: "background_remove_completed",
   BACKGROUND_REMOVE_FAILED: "background_remove_failed",
+  BACKGROUND_REMOVE_PROCESSING_BANNER_SHOWN:
+    "background_remove_processing_banner_shown",
   BACKGROUND_REMOVE_STARTED: "background_remove_started",
   BACKGROUND_REMOVE_WAIT_SHOWN: "background_remove_wait_shown",
   CART_VIEWED: "cart_viewed",

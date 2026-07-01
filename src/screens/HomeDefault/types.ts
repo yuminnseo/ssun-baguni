@@ -12,6 +12,13 @@ export type ProcessingBannerStatus =
   | "failed";
 
 export type ProcessingBannerState = {
+  analytics?: {
+    backgroundRemoveAlreadyStarted?: boolean;
+    backgroundRemoveHadPromise?: boolean;
+    hasImage: boolean;
+    priceRange: string;
+    selectedDate: string;
+  };
   imageUrl: string;
   progress: number;
   status: ProcessingBannerStatus;
